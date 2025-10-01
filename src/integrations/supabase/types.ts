@@ -160,6 +160,33 @@ export type Database = {
           },
         ]
       }
+      indicator_snapshots: {
+        Row: {
+          created_at: string
+          id: number
+          indicator: string
+          kind: string
+          snapshot_date: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          indicator: string
+          kind: string
+          snapshot_date: string
+          source: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          indicator?: string
+          kind?: string
+          snapshot_date?: string
+          source?: string
+        }
+        Relationships: []
+      }
       ingest_sources: {
         Row: {
           created_at: string
@@ -212,6 +239,7 @@ export type Database = {
           indicator: string
           kind: string
           last_seen: string
+          removed_at: string | null
           source: string
         }
         Insert: {
@@ -220,6 +248,7 @@ export type Database = {
           indicator: string
           kind: string
           last_seen?: string
+          removed_at?: string | null
           source: string
         }
         Update: {
@@ -228,6 +257,7 @@ export type Database = {
           indicator?: string
           kind?: string
           last_seen?: string
+          removed_at?: string | null
           source?: string
         }
         Relationships: []

@@ -35,44 +35,120 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0];
 
-    // TODO: Compare validated_indicators against yesterday's snapshot
-    // 
-    // Approach 1: Store daily snapshots
-    //   - Create validated_indicators_snapshots table
-    //   - Store (run_date, indicator, kind)
-    //   - Compare current vs yesterday
-    //
-    // Approach 2: Use last_validated timestamp
-    //   - Added: indicators where last_validated >= yesterday
-    //   - Removed: Check if indicators from yesterday no longer exist
-    //     (this requires a snapshot or tracking deletions)
-    //
-    // For now, calculate per kind (ipv4, domain):
-    // const { data: todayIpv4 } = await supabase
-    //   .from('validated_indicators')
-    //   .select('indicator')
-    //   .eq('kind', 'ipv4');
-    //
-    // Compare with yesterday's data (TODO: implement snapshot logic)
+    console.log(`[daily-delta] Processing delta for ${today}, comparing with ${yesterday}`);
 
-    const deltas = [
-      { run_date: today, kind: 'ipv4', added: 0, removed: 0 },
-      { run_date: today, kind: 'domain', added: 0, removed: 0 },
-    ];
+    // Step 1: Create today's snapshot from current raw_indicators
+    const { data: currentIndicators, error: fetchError } = await supabase
+      .from('raw_indicators')
+      .select('indicator, kind, source')
+      .is('removed_at', null);
 
-    console.log('[daily-delta] TODO: Implement snapshot comparison logic');
+    if (fetchError) {
+      console.error('[daily-delta] Error fetching current indicators:', fetchError);
+      throw fetchError;
+    }
 
-    // Insert into daily_deltas
-    const { error } = await supabase
+    console.log(`[daily-delta] Found ${currentIndicators?.length || 0} current indicators`);
+
+    // Insert today's snapshot
+    if (currentIndicators && currentIndicators.length > 0) {
+      const snapshotRecords = currentIndicators.map(ind => ({
+        snapshot_date: today,
+        indicator: ind.indicator,
+        kind: ind.kind,
+        source: ind.source
+      }));
+
+      // Insert in batches of 1000
+      for (let i = 0; i < snapshotRecords.length; i += 1000) {
+        const batch = snapshotRecords.slice(i, i + 1000);
+        const { error: snapshotError } = await supabase
+          .from('indicator_snapshots')
+          .upsert(batch, { onConflict: 'snapshot_date,indicator,source' });
+
+        if (snapshotError) {
+          console.error(`[daily-delta] Error inserting snapshot batch ${i}:`, snapshotError);
+        }
+      }
+      console.log(`[daily-delta] Created snapshot for ${today}`);
+    }
+
+    // Step 2: Get yesterday's snapshot
+    const { data: yesterdaySnapshot, error: yesterdayError } = await supabase
+      .from('indicator_snapshots')
+      .select('indicator, kind, source')
+      .eq('snapshot_date', yesterday);
+
+    if (yesterdayError) {
+      console.error('[daily-delta] Error fetching yesterday snapshot:', yesterdayError);
+      throw yesterdayError;
+    }
+
+    console.log(`[daily-delta] Found ${yesterdaySnapshot?.length || 0} indicators in yesterday's snapshot`);
+
+    // Step 3: Calculate deltas per kind
+    const deltas: { run_date: string; kind: string; added: number; removed: number }[] = [];
+
+    for (const kind of ['ipv4', 'domain']) {
+      const todaySet = new Set(
+        currentIndicators
+          ?.filter(ind => ind.kind === kind)
+          .map(ind => ind.indicator) || []
+      );
+
+      const yesterdaySet = new Set(
+        yesterdaySnapshot
+          ?.filter(ind => ind.kind === kind)
+          .map(ind => ind.indicator) || []
+      );
+
+      // Added: in today but not in yesterday
+      const added = [...todaySet].filter(ind => !yesterdaySet.has(ind)).length;
+
+      // Removed: in yesterday but not in today
+      const removed = [...yesterdaySet].filter(ind => !todaySet.has(ind)).length;
+
+      deltas.push({
+        run_date: today,
+        kind,
+        added,
+        removed
+      });
+
+      console.log(`[daily-delta] ${kind}: +${added} -${removed}`);
+
+      // Step 4: Mark removed indicators in raw_indicators
+      if (removed > 0) {
+        const removedIndicators = [...yesterdaySet].filter(ind => !todaySet.has(ind));
+        
+        for (let i = 0; i < removedIndicators.length; i += 100) {
+          const batch = removedIndicators.slice(i, i + 100);
+          const { error: updateError } = await supabase
+            .from('raw_indicators')
+            .update({ removed_at: new Date().toISOString() })
+            .in('indicator', batch)
+            .eq('kind', kind)
+            .is('removed_at', null);
+
+          if (updateError) {
+            console.error(`[daily-delta] Error marking indicators as removed:`, updateError);
+          }
+        }
+        console.log(`[daily-delta] Marked ${removed} ${kind} indicators as removed`);
+      }
+    }
+
+    // Step 5: Insert deltas into daily_deltas
+    const { error: insertError } = await supabase
       .from('daily_deltas')
       .insert(deltas);
 
-    if (error) {
-      console.error('[daily-delta] Error inserting deltas:', error);
-      throw error;
+    if (insertError) {
+      console.error('[daily-delta] Error inserting deltas:', insertError);
+      throw insertError;
     }
 
-    console.log(`[daily-delta] Inserted deltas for ${today}`);
+    console.log(`[daily-delta] Successfully calculated and stored deltas for ${today}`);
 
     return new Response(
       JSON.stringify({ success: true, date: today, deltas }),
