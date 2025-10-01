@@ -46,8 +46,11 @@ export function AppLayout() {
             <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
               Dashboard
             </Link>
-            <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
-              Admin
+            <Link to="/indicators" className="text-sm font-medium hover:text-primary transition-colors">
+              Indicators
+            </Link>
+            <Link to="/feed-tokens" className="text-sm font-medium hover:text-primary transition-colors">
+              Feed Tokens
             </Link>
           </nav>
           
