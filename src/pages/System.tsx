@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +20,19 @@ import {
 export default function System() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [logs, setLogs] = useState<any[]>([]);
+  const { isSuperAdmin, loading: roleLoading } = useUserRole();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!roleLoading && !isSuperAdmin) {
+      navigate('/dashboard');
+      toast.error('Access denied: Super admin only');
+    }
+  }, [isSuperAdmin, roleLoading, navigate]);
+
+  if (roleLoading || !isSuperAdmin) {
+    return null;
+  }
 
   const testEdgeFunction = async (functionName: string) => {
     setLoading({ ...loading, [functionName]: true });

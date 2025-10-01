@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,8 @@ interface IngestSource {
 }
 
 export default function IngestSources() {
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { isSuperAdmin, loading: roleLoading } = useUserRole();
+  const navigate = useNavigate();
   const [sources, setSources] = useState<IngestSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -52,6 +54,17 @@ export default function IngestSources() {
   useEffect(() => {
     loadSources();
   }, []);
+
+  useEffect(() => {
+    if (!roleLoading && !isSuperAdmin) {
+      navigate('/dashboard');
+      toast.error('Access denied: Super admin only');
+    }
+  }, [isSuperAdmin, roleLoading, navigate]);
+
+  if (roleLoading) {
+    return null;
+  }
 
   const loadSources = async () => {
     try {
@@ -233,7 +246,7 @@ export default function IngestSources() {
           </p>
         </div>
         <div className="flex gap-2">
-          {isAdmin && (
+          {isSuperAdmin && (
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">

@@ -487,6 +487,10 @@ export type Database = {
         Args: { function_name: string }
         Returns: undefined
       }
+      is_super_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean

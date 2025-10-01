@@ -4,9 +4,11 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 
 export function AppLayout() {
   const [user, setUser] = useState<User | null>(null);
+  const { isSuperAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export function AppLayout() {
     navigate('/auth');
   };
 
-  if (!user) {
+  if (!user || roleLoading) {
     return null;
   }
 
@@ -52,12 +54,16 @@ export function AppLayout() {
             <Link to="/feed-tokens" className="text-sm font-medium hover:text-primary transition-colors">
               Feed Tokens
             </Link>
-            <Link to="/system" className="text-sm font-medium hover:text-primary transition-colors">
-              System
-            </Link>
-            <Link to="/ingest-sources" className="text-sm font-medium hover:text-primary transition-colors">
-              Sources
-            </Link>
+            {isSuperAdmin && (
+              <>
+                <Link to="/system" className="text-sm font-medium hover:text-primary transition-colors">
+                  System
+                </Link>
+                <Link to="/ingest-sources" className="text-sm font-medium hover:text-primary transition-colors">
+                  Sources
+                </Link>
+              </>
+            )}
           </nav>
           
           <div className="flex items-center gap-4">
