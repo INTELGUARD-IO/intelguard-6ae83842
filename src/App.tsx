@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Indicators from "./pages/Indicators";
 import FeedTokens from "./pages/FeedTokens";
+import System from "./pages/System";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/indicators" element={<Indicators />} />
             <Route path="/feed-tokens" element={<FeedTokens />} />
+            <Route path="/system" element={<System />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

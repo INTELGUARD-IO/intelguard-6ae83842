@@ -412,6 +412,10 @@ export type Database = {
         Args: { function_name: string }
         Returns: undefined
       }
+      is_tenant_member: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

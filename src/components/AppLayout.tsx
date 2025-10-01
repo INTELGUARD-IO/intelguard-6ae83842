@@ -52,6 +52,9 @@ export function AppLayout() {
             <Link to="/feed-tokens" className="text-sm font-medium hover:text-primary transition-colors">
               Feed Tokens
             </Link>
+            <Link to="/system" className="text-sm font-medium hover:text-primary transition-colors">
+              System
+            </Link>
           </nav>
           
           <div className="flex items-center gap-4">
