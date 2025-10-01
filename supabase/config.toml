@@ -2,3 +2,21 @@ project_id = "qmsidlazqaqwcptpsjqh"
 
 [functions.feed]
 verify_jwt = false
+
+[functions.feed-get]
+verify_jwt = false
+
+[functions.ingest]
+verify_jwt = false
+
+[functions.schedule-validations]
+verify_jwt = false
+
+[functions.run-validations]
+verify_jwt = false
+
+[functions.daily-delta]
+verify_jwt = false
+
+[functions.email-dispatch]
+verify_jwt = false
