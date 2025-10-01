@@ -67,6 +67,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_preferences: {
+        Row: {
+          freq: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          freq?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          freq?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feed_access_logs: {
         Row: {
           created_at: string
