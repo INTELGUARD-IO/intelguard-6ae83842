@@ -387,7 +387,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      _call_edge: {
+        Args: { function_name: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
