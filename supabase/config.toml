@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.ingest]
 verify_jwt = false
 
+[functions.process-single-source]
+verify_jwt = false
+
 [functions.schedule-validations]
 verify_jwt = false
 

@@ -108,23 +108,20 @@ function chunks<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+// Orchestrator: launches separate jobs for each source
 Deno.serve(async (req) => {
-  // Preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Enforce CRON_SECRET only if provided (for cron jobs)
   const secret = Deno.env.get('CRON_SECRET');
   const providedSecret = req.headers.get('x-cron-secret');
   
-  // If a secret is provided, validate it
   if (providedSecret && providedSecret !== secret) {
     console.error('[ingest] Invalid cron secret');
     return new Response('forbidden', { status: 403, headers: corsHeaders });
   }
   
-  // If no secret provided, allow manual testing
   if (!providedSecret) {
     console.log('[ingest] Manual test invocation (no cron secret provided)');
   }
@@ -134,9 +131,9 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
-    console.log('[ingest] Starting ingestion run…');
+    console.log('[ingest] Starting orchestration run…');
 
-    // Fetch enabled sources from database
+    // Fetch enabled sources
     const { data: sources, error: sourcesError } = await supabase
       .from('ingest_sources')
       .select('*')
@@ -155,143 +152,78 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[ingest] Processing ${sources.length} enabled sources`);
+    console.log(`[ingest] Orchestrating ${sources.length} sources via background jobs`);
 
-    const nowIso = new Date().toISOString();
-    const BATCH_SIZE = 1000;
-    let totalProcessed = 0;
-
-    // Process each source with streaming
-    for (const source of sources) {
-      const startTime = Date.now();
-      let sourceCount = 0;
-      let batchBuffer: Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> = [];
-      const seen = new Set<string>(); // Per-source deduplication
+    const projectUrl = supabaseUrl.replace('.supabase.co', '.functions.supabase.co');
+    const processFunctionUrl = `${projectUrl}/process-single-source`;
+    
+    // Launch background jobs for each source (max 3 concurrent)
+    const MAX_CONCURRENT = 3;
+    const jobs: Promise<void>[] = [];
+    
+    for (let i = 0; i < sources.length; i += MAX_CONCURRENT) {
+      const batch = sources.slice(i, i + MAX_CONCURRENT);
       
-      try {
-        console.log(`[ingest] Starting ${source.name} (${source.kind})`);
-        
-        // Stream and process line by line
-        for await (const line of fetchTextStream(source.url)) {
-          const normalized = normalizeLine(line, source.kind, source.url);
-          if (!normalized) continue;
+      const batchJobs = batch.map(async (source) => {
+        try {
+          console.log(`[ingest] Launching job for ${source.name}`);
           
-          // Deduplicate within this source
-          const key = `${normalized.indicator}||${normalized.source}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          
-          batchBuffer.push(normalized);
-          sourceCount++;
-          
-          // Process batch when buffer is full
-          if (batchBuffer.length >= BATCH_SIZE) {
-            const upsertTime = new Date().toISOString();
-            const toInsert = batchBuffer.map((r) => ({
-              indicator: r.indicator,
-              kind: r.kind,
-              source: r.source,
-              first_seen: upsertTime,
-              last_seen: upsertTime,
-            }));
-            
-            const { error: insErr } = await supabase
-              .from('raw_indicators')
-              .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
-            
-            if (insErr) {
-              console.error('[ingest] Batch insert error:', insErr);
-              throw insErr;
-            }
-            
-            // Update last_seen for existing records
-            const indicators = batchBuffer.map(r => r.indicator);
-            const { error: updErr } = await supabase
-              .from('raw_indicators')
-              .update({ last_seen: upsertTime })
-              .eq('source', source.url)
-              .in('indicator', indicators);
-            
-            if (updErr) {
-              console.error('[ingest] Batch update error:', updErr);
-            }
-            
-            totalProcessed += batchBuffer.length;
-            console.log(`[ingest] ${source.name}: processed ${sourceCount} indicators (batch ${Math.floor(sourceCount / BATCH_SIZE)})`);
-            batchBuffer = [];
+          const response = await fetch(processFunctionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceKey}`,
+              'x-cron-secret': secret || '',
+            },
+            body: JSON.stringify({ sourceId: source.id }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
+
+          const result = await response.json();
+          console.log(`[ingest] ✓ ${source.name} completed: ${result.count} indicators`);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.error(`[ingest] ✗ ${source.name} failed:`, errorMsg);
+          
+          // Update source with error
+          await supabase
+            .from('ingest_sources')
+            .update({
+              last_run: new Date().toISOString(),
+              last_error: errorMsg,
+            })
+            .eq('id', source.id);
         }
-        
-        // Process remaining buffer
-        if (batchBuffer.length > 0) {
-          const upsertTime = new Date().toISOString();
-          const toInsert = batchBuffer.map((r) => ({
-            indicator: r.indicator,
-            kind: r.kind,
-            source: r.source,
-            first_seen: upsertTime,
-            last_seen: upsertTime,
-          }));
-          
-          const { error: insErr } = await supabase
-            .from('raw_indicators')
-            .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
-          
-          if (insErr) {
-            console.error('[ingest] Final batch insert error:', insErr);
-            throw insErr;
-          }
-          
-          // Update last_seen for existing records
-          const indicators = batchBuffer.map(r => r.indicator);
-          const { error: updErr } = await supabase
-            .from('raw_indicators')
-            .update({ last_seen: upsertTime })
-            .eq('source', source.url)
-            .in('indicator', indicators);
-          
-          if (updErr) {
-            console.error('[ingest] Final batch update error:', updErr);
-          }
-          
-          totalProcessed += batchBuffer.length;
-        }
-        
-        const duration = Date.now() - startTime;
-        console.log(`[ingest] ${source.kind.toUpperCase()} +${sourceCount} from ${source.name} (${duration}ms, ${(sourceCount / (duration / 1000)).toFixed(0)} ind/sec)`);
-        
-        // Update source success stats
-        await supabase
-          .from('ingest_sources')
-          .update({
-            last_success: nowIso,
-            last_run: nowIso,
-            indicators_count: sourceCount,
-            last_error: null,
-          })
-          .eq('id', source.id);
-      } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        console.warn(`[ingest] ${source.kind.toUpperCase()} source failed ${source.name}:`, errorMsg);
-        
-        // Update source error stats
-        await supabase
-          .from('ingest_sources')
-          .update({
-            last_run: nowIso,
-            last_error: errorMsg,
-          })
-          .eq('id', source.id);
+      });
+
+      jobs.push(...batchJobs);
+      
+      // Wait for current batch to complete before starting next batch
+      await Promise.all(batchJobs);
+      
+      // Small delay between batches to avoid overload
+      if (i + MAX_CONCURRENT < sources.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
-    console.log('[ingest] Done. Total processed:', totalProcessed);
-    return new Response(JSON.stringify({ success: true, count: totalProcessed }), {
+    await Promise.all(jobs);
+
+    console.log('[ingest] All orchestration jobs completed');
+    return new Response(JSON.stringify({ 
+      success: true, 
+      sources_processed: sources.length,
+      note: 'Jobs launched via background processing'
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('[ingest] Error:', error);
+    console.error('[ingest] Orchestration error:', error);
     const msg = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
