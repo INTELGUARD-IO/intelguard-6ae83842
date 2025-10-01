@@ -25,45 +25,66 @@ const isIPv4 = (s: string) =>
 const isDomain = (s: string) =>
   /^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,}$/i.test(s.trim());
 
-// fetch con UA e timeout
-async function fetchText(url: string, timeoutMs = 20000): Promise<string> {
+// Stream processing with line-by-line reading for large files
+async function* fetchTextStream(url: string, timeoutMs = 120000): AsyncGenerator<string> {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(url, {
-      headers: { 'User-Agent': 'intelguard/ingest/1.0' },
+      headers: { 
+        'User-Agent': 'intelguard/ingest/1.0',
+        'Accept-Encoding': 'gzip, deflate'
+      },
       signal: ctrl.signal,
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.text();
+    
+    if (!r.body) throw new Error('No response body');
+    
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        yield line;
+      }
+    }
+    
+    // Yield remaining buffer
+    if (buffer) yield buffer;
   } finally {
     clearTimeout(id);
   }
 }
 
-// normalizza un testo in array {indicator, kind, source}
-function normalizeLines(
-  txt: string,
+// Process a single line and return indicator if valid
+function normalizeLine(
+  line: string,
   kind: 'ipv4' | 'domain',
   source: string,
-): Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> {
-  const out: Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> = [];
-  for (const raw of txt.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith(';')) continue;
+): { indicator: string; kind: 'ipv4' | 'domain'; source: string } | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) return null;
 
-    // hostfile: prendi la prima colonna (di solito IP o dominio)
-    const firstCol = line.split(/\s+/)[0];
+  // hostfile: prendi la prima colonna (di solito IP o dominio)
+  const firstCol = trimmed.split(/\s+/)[0];
 
-    if (kind === 'ipv4') {
-      if (isIPv4(firstCol)) out.push({ indicator: firstCol, kind, source });
-    } else {
-      // domini sempre in lowercase
-      const dom = firstCol.toLowerCase();
-      if (isDomain(dom)) out.push({ indicator: dom, kind, source });
-    }
+  if (kind === 'ipv4') {
+    if (isIPv4(firstCol)) return { indicator: firstCol, kind, source };
+  } else {
+    // domini sempre in lowercase
+    const dom = firstCol.toLowerCase();
+    if (isDomain(dom)) return { indicator: dom, kind, source };
   }
-  return out;
+  return null;
 }
 
 // deduplica per (indicator, source)
@@ -136,19 +157,108 @@ Deno.serve(async (req) => {
 
     console.log(`[ingest] Processing ${sources.length} enabled sources`);
 
-    const collected: Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> = [];
     const nowIso = new Date().toISOString();
+    const BATCH_SIZE = 1000;
+    let totalProcessed = 0;
 
-    // Process each source
+    // Process each source with streaming
     for (const source of sources) {
       const startTime = Date.now();
+      let sourceCount = 0;
+      let batchBuffer: Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> = [];
+      const seen = new Set<string>(); // Per-source deduplication
+      
       try {
-        const txt = await fetchText(source.url);
-        const norm = normalizeLines(txt, source.kind, source.url);
-        collected.push(...norm);
+        console.log(`[ingest] Starting ${source.name} (${source.kind})`);
+        
+        // Stream and process line by line
+        for await (const line of fetchTextStream(source.url)) {
+          const normalized = normalizeLine(line, source.kind, source.url);
+          if (!normalized) continue;
+          
+          // Deduplicate within this source
+          const key = `${normalized.indicator}||${normalized.source}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          
+          batchBuffer.push(normalized);
+          sourceCount++;
+          
+          // Process batch when buffer is full
+          if (batchBuffer.length >= BATCH_SIZE) {
+            const upsertTime = new Date().toISOString();
+            const toInsert = batchBuffer.map((r) => ({
+              indicator: r.indicator,
+              kind: r.kind,
+              source: r.source,
+              first_seen: upsertTime,
+              last_seen: upsertTime,
+            }));
+            
+            const { error: insErr } = await supabase
+              .from('raw_indicators')
+              .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
+            
+            if (insErr) {
+              console.error('[ingest] Batch insert error:', insErr);
+              throw insErr;
+            }
+            
+            // Update last_seen for existing records
+            const indicators = batchBuffer.map(r => r.indicator);
+            const { error: updErr } = await supabase
+              .from('raw_indicators')
+              .update({ last_seen: upsertTime })
+              .eq('source', source.url)
+              .in('indicator', indicators);
+            
+            if (updErr) {
+              console.error('[ingest] Batch update error:', updErr);
+            }
+            
+            totalProcessed += batchBuffer.length;
+            console.log(`[ingest] ${source.name}: processed ${sourceCount} indicators (batch ${Math.floor(sourceCount / BATCH_SIZE)})`);
+            batchBuffer = [];
+          }
+        }
+        
+        // Process remaining buffer
+        if (batchBuffer.length > 0) {
+          const upsertTime = new Date().toISOString();
+          const toInsert = batchBuffer.map((r) => ({
+            indicator: r.indicator,
+            kind: r.kind,
+            source: r.source,
+            first_seen: upsertTime,
+            last_seen: upsertTime,
+          }));
+          
+          const { error: insErr } = await supabase
+            .from('raw_indicators')
+            .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
+          
+          if (insErr) {
+            console.error('[ingest] Final batch insert error:', insErr);
+            throw insErr;
+          }
+          
+          // Update last_seen for existing records
+          const indicators = batchBuffer.map(r => r.indicator);
+          const { error: updErr } = await supabase
+            .from('raw_indicators')
+            .update({ last_seen: upsertTime })
+            .eq('source', source.url)
+            .in('indicator', indicators);
+          
+          if (updErr) {
+            console.error('[ingest] Final batch update error:', updErr);
+          }
+          
+          totalProcessed += batchBuffer.length;
+        }
         
         const duration = Date.now() - startTime;
-        console.log(`[ingest] ${source.kind.toUpperCase()} +${norm.length} from ${source.name} (${duration}ms)`);
+        console.log(`[ingest] ${source.kind.toUpperCase()} +${sourceCount} from ${source.name} (${duration}ms, ${(sourceCount / (duration / 1000)).toFixed(0)} ind/sec)`);
         
         // Update source success stats
         await supabase
@@ -156,7 +266,7 @@ Deno.serve(async (req) => {
           .update({
             last_success: nowIso,
             last_run: nowIso,
-            indicators_count: norm.length,
+            indicators_count: sourceCount,
             last_error: null,
           })
           .eq('id', source.id);
@@ -175,74 +285,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3) Dedup
-    const deduped = dedupeByIndicatorSource(collected);
-    console.log(`[ingest] Total normalized: ${collected.length} → deduped: ${deduped.length}`);
-
-    if (deduped.length === 0) {
-      return new Response(JSON.stringify({ success: true, count: 0, note: 'no data' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // IMPORTANTISSIMO:
-    // Nel tuo schema la UNIQUE è (indicator, source).
-    // Il tuo codice iniziale usava onConflict 'indicator,kind,source' → NON combacia.
-    // Usiamo insert IGNORE per non toccare first_seen degli esistenti,
-    // poi UPDATE del last_seen per tutti gli indicatori toccati.
-
-    const CHUNK = 1000;
-    const upsertTime = new Date().toISOString();
-
-    // 4) INSERT IGNORE (solo nuovi): use insert with "ignoreDuplicates: true"
-    for (const batch of chunks(deduped, CHUNK)) {
-      const toInsert = batch.map((r) => ({
-        indicator: r.indicator,
-        kind: r.kind,
-        source: r.source,
-        first_seen: upsertTime,
-        last_seen: upsertTime,
-      }));
-
-      // Inserisce nuovi, ignora conflitti su (indicator,source)
-      const { error: insErr } = await supabase
-        .from('raw_indicators')
-        .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
-
-      if (insErr) {
-        console.error('[ingest] insert error:', insErr);
-        throw insErr;
-      }
-    }
-
-    // 5) UPDATE last_seen per tutti i record toccati (nuovi o già esistenti)
-    // Nota: Supabase non consente update in bulk per IN (multi-colonna) con un'unica chiamata comoda.
-    // Facciamo per "source" a blocchi per minimizzare round-trip.
-    const bySource = new Map<string, Set<string>>();
-    for (const r of deduped) {
-      if (!bySource.has(r.source)) bySource.set(r.source, new Set());
-      bySource.get(r.source)!.add(r.indicator);
-    }
-
-    for (const [source, indicatorsSet] of bySource.entries()) {
-      const indicators = Array.from(indicatorsSet);
-      for (const part of chunks(indicators, CHUNK)) {
-        // Aggiorna last_seen = now() per (source = X AND indicator IN (...))
-        const { error: updErr } = await supabase
-          .from('raw_indicators')
-          .update({ last_seen: upsertTime })
-          .eq('source', source)
-          .in('indicator', part);
-        if (updErr) {
-          console.error('[ingest] update last_seen error:', updErr);
-          throw updErr;
-        }
-      }
-    }
-
-    console.log('[ingest] Done. Upserted/updated:', deduped.length);
-    return new Response(JSON.stringify({ success: true, count: deduped.length }), {
+    console.log('[ingest] Done. Total processed:', totalProcessed);
+    return new Response(JSON.stringify({ success: true, count: totalProcessed }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
