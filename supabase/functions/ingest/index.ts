@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
       // Inserisce nuovi, ignora conflitti su (indicator,source)
       const { error: insErr } = await supabase
         .from('raw_indicators')
-        .insert(toInsert, { ignoreDuplicates: true });
+        .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
 
       if (insErr) {
         console.error('[ingest] insert error:', insErr);
