@@ -160,6 +160,51 @@ export type Database = {
           },
         ]
       }
+      ingest_sources: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          indicators_count: number | null
+          kind: string
+          last_error: string | null
+          last_run: string | null
+          last_success: string | null
+          name: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          indicators_count?: number | null
+          kind: string
+          last_error?: string | null
+          last_run?: string | null
+          last_success?: string | null
+          name: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          indicators_count?: number | null
+          kind?: string
+          last_error?: string | null
+          last_run?: string | null
+          last_success?: string | null
+          name?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       raw_indicators: {
         Row: {
           first_seen: string

@@ -55,6 +55,9 @@ export function AppLayout() {
             <Link to="/system" className="text-sm font-medium hover:text-primary transition-colors">
               System
             </Link>
+            <Link to="/ingest-sources" className="text-sm font-medium hover:text-primary transition-colors">
+              Sources
+            </Link>
           </nav>
           
           <div className="flex items-center gap-4">
