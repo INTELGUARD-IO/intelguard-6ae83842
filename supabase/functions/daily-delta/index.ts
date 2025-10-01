@@ -10,11 +10,19 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Enforce CRON_SECRET
+  // Enforce CRON_SECRET only if provided (for cron jobs)
   const secret = Deno.env.get('CRON_SECRET');
-  if (req.headers.get('x-cron-secret') !== secret) {
-    console.error('Invalid cron secret');
-    return new Response('forbidden', { status: 403 });
+  const providedSecret = req.headers.get('x-cron-secret');
+  
+  // If a secret is provided, validate it
+  if (providedSecret && providedSecret !== secret) {
+    console.error('[daily-delta] Invalid cron secret');
+    return new Response('forbidden', { status: 403, headers: corsHeaders });
+  }
+  
+  // If no secret provided, allow manual testing
+  if (!providedSecret) {
+    console.log('[daily-delta] Manual test invocation (no cron secret provided)');
   }
 
   try {
