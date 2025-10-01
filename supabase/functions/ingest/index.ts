@@ -107,11 +107,19 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Enforce CRON_SECRET per tutte le invocazioni programmate
+  // Enforce CRON_SECRET only if provided (for cron jobs)
   const secret = Deno.env.get('CRON_SECRET');
-  if (req.headers.get('x-cron-secret') !== secret) {
+  const providedSecret = req.headers.get('x-cron-secret');
+  
+  // If a secret is provided, validate it
+  if (providedSecret && providedSecret !== secret) {
     console.error('[ingest] Invalid cron secret');
     return new Response('forbidden', { status: 403, headers: corsHeaders });
+  }
+  
+  // If no secret provided, allow manual testing
+  if (!providedSecret) {
+    console.log('[ingest] Manual test invocation (no cron secret provided)');
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
