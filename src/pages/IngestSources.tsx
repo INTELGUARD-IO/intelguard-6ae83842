@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface IngestSource {
   id: string;
@@ -29,9 +30,18 @@ interface IngestSource {
 }
 
 export default function IngestSources() {
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [sources, setSources] = useState<IngestSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadConfig, setUploadConfig] = useState({
+    kind: 'ipv4' as 'ipv4' | 'domain',
+    sourceName: '',
+    file: null as File | null,
+  });
   const [newSource, setNewSource] = useState({
     name: '',
     url: '',
@@ -134,7 +144,75 @@ export default function IngestSources() {
     return <Badge className="bg-green-600 hover:bg-green-700">Success</Badge>;
   };
 
-  if (loading) {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.txt')) {
+      toast.error('Only .txt files are supported');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadConfig({ ...uploadConfig, file });
+  };
+
+  const handleManualUpload = async () => {
+    if (!uploadConfig.file || !uploadConfig.sourceName) {
+      toast.error('Please select a file and provide a source name');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Not authenticated');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', uploadConfig.file);
+      formData.append('kind', uploadConfig.kind);
+      formData.append('sourceName', uploadConfig.sourceName);
+
+      const response = await supabase.functions.invoke('manual-ingest', {
+        body: formData,
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      const result = response.data;
+      
+      if (result.success) {
+        toast.success(
+          `Upload complete: ${result.added} added, ${result.duplicates} duplicates, ${result.errors} errors`
+        );
+        if (result.errorDetails.length > 0) {
+          console.warn('Upload errors:', result.errorDetails);
+        }
+        setUploadDialogOpen(false);
+        setUploadConfig({ kind: 'ipv4', sourceName: '', file: null });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        loadSources();
+      } else {
+        toast.error('Upload failed: ' + result.errorDetails.join(', '));
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -154,13 +232,78 @@ export default function IngestSources() {
             Manage threat intelligence data sources
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Source
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Manual Import
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Manual Import</DialogTitle>
+                  <DialogDescription>
+                    Upload a .txt file with one indicator per line (Admin only)
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="upload-source-name">Source Name</Label>
+                    <Input
+                      id="upload-source-name"
+                      value={uploadConfig.sourceName}
+                      onChange={(e) => setUploadConfig({ ...uploadConfig, sourceName: e.target.value })}
+                      placeholder="My Custom List"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="upload-kind">Type</Label>
+                    <Select value={uploadConfig.kind} onValueChange={(v) => setUploadConfig({ ...uploadConfig, kind: v as 'ipv4' | 'domain' })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ipv4">IPv4</SelectItem>
+                        <SelectItem value="domain">Domain</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="upload-file">File (.txt, max 10MB)</Label>
+                    <Input
+                      id="upload-file"
+                      type="file"
+                      accept=".txt"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                    />
+                    {uploadConfig.file && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {uploadConfig.file.name} ({(uploadConfig.file.size / 1024).toFixed(2)} KB)
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleManualUpload} disabled={uploading || !uploadConfig.file || !uploadConfig.sourceName}>
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Source
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Source</DialogTitle>
@@ -215,6 +358,7 @@ export default function IngestSources() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

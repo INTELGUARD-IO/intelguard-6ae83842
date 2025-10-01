@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.email-dispatch]
 verify_jwt = false
+
+[functions.manual-ingest]
+verify_jwt = false
