@@ -11,6 +11,7 @@ import Indicators from "./pages/Indicators";
 import FeedTokens from "./pages/FeedTokens";
 import System from "./pages/System";
 import IngestSources from "./pages/IngestSources";
+import Monitoring from "./pages/Monitoring";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,8 +29,9 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/indicators" element={<Indicators />} />
             <Route path="/feed-tokens" element={<FeedTokens />} />
-  <Route path="/system" element={<System />} />
-          <Route path="/ingest-sources" element={<IngestSources />} />
+            <Route path="/system" element={<System />} />
+            <Route path="/ingest-sources" element={<IngestSources />} />
+            <Route path="/monitoring" element={<Monitoring />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

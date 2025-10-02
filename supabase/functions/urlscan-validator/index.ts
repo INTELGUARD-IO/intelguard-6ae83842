@@ -45,7 +45,6 @@ interface URLScanSearchResult {
   total: number;
 }
 
-// Helper function for Supabase REST API calls
 const supabaseQuery = async (
   url: string,
   serviceKey: string,
@@ -91,7 +90,7 @@ Deno.serve(async (req) => {
     const cronSecretHeader = req.headers.get('x-cron-secret');
     
     if (CRON_SECRET && cronSecretHeader !== CRON_SECRET) {
-      console.error('Invalid cron secret');
+      console.error('[URLSCAN] Invalid cron secret');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -106,9 +105,10 @@ Deno.serve(async (req) => {
       throw new Error('URLSCAN_API_KEY not configured');
     }
 
-    console.log('Starting URLScan validator...');
+    console.log('[URLSCAN] === STARTING VALIDATION RUN ===');
 
-    // Fetch domains to validate (833 per run, prioritize unchecked and multi-source)
+    // Step 1: Fetch domains to validate
+    console.log('[URLSCAN] Step 1: Fetching candidate domains...');
     const candidates = await supabaseQuery(
       supabaseUrl,
       supabaseServiceKey,
@@ -119,7 +119,6 @@ Deno.serve(async (req) => {
     );
 
     if (!candidates || candidates.length === 0) {
-      // If no unchecked domains, refresh oldest checked (cache expiry)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const oldChecked = await supabaseQuery(
         supabaseUrl,
@@ -131,14 +130,13 @@ Deno.serve(async (req) => {
       );
 
       if (!oldChecked || oldChecked.length === 0) {
-        console.log('No domains to validate');
+        console.log('[URLSCAN] No domains to validate');
         return new Response(
           JSON.stringify({ success: true, message: 'No domains to validate' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Refresh these domains
       const indicators = oldChecked.map((d: any) => d.indicator).join(',');
       const refreshCandidates = await supabaseQuery(
         supabaseUrl,
@@ -150,7 +148,7 @@ Deno.serve(async (req) => {
       );
 
       if (!refreshCandidates || refreshCandidates.length === 0) {
-        console.log('No domains to refresh');
+        console.log('[URLSCAN] No domains to refresh');
         return new Response(
           JSON.stringify({ success: true, message: 'No domains to refresh' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -160,72 +158,57 @@ Deno.serve(async (req) => {
       candidates.push(...refreshCandidates);
     }
 
-    console.log(`Processing ${candidates.length} domains`);
+    console.log(`[URLSCAN] ✓ Step 1 Complete: ${candidates.length} candidate domains found`);
 
-    let processedCount = 0;
+    // Step 2: Process domains with URLScan.io API
+    console.log('[URLSCAN] Step 2: Validating domains via URLScan.io API...');
+    let processed = 0;
+    let validated = 0;
+    let errors = 0;
+    let maliciousFound = 0;
+    let cleanFound = 0;
     let apiCallCount = 0;
+
     const maxCallsPerMinute = 60;
-    const maxCallsPerHour = 500;
     const maxCallsPerDay = 4998;
 
     let minuteStartTime = Date.now();
-    let hourStartTime = Date.now();
     let callsThisMinute = 0;
-    let callsThisHour = 0;
 
-    // Rate limiting helper
     const checkRateLimit = async () => {
       const now = Date.now();
       
-      // Reset minute counter
       if (now - minuteStartTime >= 60000) {
         minuteStartTime = now;
         callsThisMinute = 0;
       }
-      
-      // Reset hour counter
-      if (now - hourStartTime >= 3600000) {
-        hourStartTime = now;
-        callsThisHour = 0;
-      }
 
-      // Check limits
       if (callsThisMinute >= maxCallsPerMinute) {
         const waitTime = 60000 - (now - minuteStartTime);
-        console.log(`Rate limit: waiting ${waitTime}ms for minute reset`);
+        console.log(`[URLSCAN] Rate limit: waiting ${waitTime}ms for minute reset`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         minuteStartTime = Date.now();
         callsThisMinute = 0;
       }
 
-      if (callsThisHour >= maxCallsPerHour) {
-        const waitTime = 3600000 - (now - hourStartTime);
-        console.log(`Rate limit: waiting ${waitTime}ms for hour reset`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        hourStartTime = Date.now();
-        callsThisHour = 0;
-      }
-
       if (apiCallCount >= maxCallsPerDay) {
-        console.log(`Daily limit reached: ${maxCallsPerDay} calls`);
+        console.log(`[URLSCAN] Daily limit reached: ${maxCallsPerDay} calls`);
         return false;
       }
 
       return true;
     };
 
-    // Process each domain
     for (const candidate of candidates) {
       if (!(await checkRateLimit())) {
-        console.log(`Stopping: daily limit reached at ${processedCount} domains`);
+        console.log(`[URLSCAN] Stopping: daily limit reached at ${processed} domains`);
         break;
       }
 
       try {
         const domain = candidate.indicator;
-        console.log(`Validating domain: ${domain}`);
+        processed++;
 
-        // Query URLScan.io Search API
         const searchUrl = `https://urlscan.io/api/v1/search/?q=domain:${encodeURIComponent(domain)}&size=10`;
         const response = await fetch(searchUrl, {
           method: 'GET',
@@ -237,26 +220,24 @@ Deno.serve(async (req) => {
 
         apiCallCount++;
         callsThisMinute++;
-        callsThisHour++;
 
         if (!response.ok) {
           if (response.status === 429) {
-            console.warn(`Rate limited on domain ${domain}, waiting 60s`);
+            console.warn(`[URLSCAN] Rate limited on ${domain}, waiting 60s`);
             await new Promise(resolve => setTimeout(resolve, 60000));
             continue;
           }
-          console.error(`URLScan API error for ${domain}: ${response.status}`);
+          console.error(`[URLSCAN] API error for ${domain}: ${response.status}`);
+          errors++;
           continue;
         }
 
         const searchData: URLScanSearchResult = await response.json();
 
-        // Calculate malicious score (0-100)
         let maliciousScore = 0;
         let isMalicious = false;
         const recentScans = searchData.results || [];
 
-        // Analyze recent scans (last 30 days)
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
         const relevantScans = recentScans.filter(scan => 
           new Date(scan.task.time).getTime() > thirtyDaysAgo
@@ -288,8 +269,15 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Cap score at 100
         maliciousScore = Math.min(maliciousScore, 100);
+
+        if (maliciousScore > 50) {
+          maliciousFound++;
+          console.log(`[URLSCAN] ⚠ Malicious: ${domain} (score: ${maliciousScore}%, scans: ${relevantScans.length})`);
+        } else {
+          cleanFound++;
+          console.log(`[URLSCAN] ✓ Clean: ${domain} (score: ${maliciousScore}%, scans: ${relevantScans.length})`);
+        }
 
         // Store in vendor_checks
         try {
@@ -314,7 +302,7 @@ Deno.serve(async (req) => {
             '?on_conflict=vendor,kind,indicator'
           );
         } catch (vendorError) {
-          console.error(`Error storing vendor check for ${domain}:`, vendorError);
+          console.error(`[URLSCAN] Error storing vendor check for ${domain}:`, vendorError);
         }
 
         // Update dynamic_raw_indicators
@@ -331,38 +319,53 @@ Deno.serve(async (req) => {
             },
             `?indicator=eq.${encodeURIComponent(domain)}&kind=eq.domain`
           );
+          validated++;
         } catch (updateError) {
-          console.error(`Error updating indicator ${domain}:`, updateError);
+          console.error(`[URLSCAN] Error updating ${domain}:`, updateError);
         }
 
-        processedCount++;
+        // Progress logging
+        if (processed % 50 === 0) {
+          console.log(`[URLSCAN] Progress: ${processed}/${candidates.length} processed, ${validated} validated`);
+        }
 
-        // Small delay between calls (1 call/sec = 60/min)
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-      } catch (error) {
-        console.error(`Error processing domain ${candidate.indicator}:`, error);
+      } catch (err: any) {
+        errors++;
+        console.error(`[URLSCAN] ✗ Error checking ${candidate.indicator}:`, err.message);
       }
     }
 
-    console.log(`URLScan validation complete: ${processedCount} domains processed, ${apiCallCount} API calls made`);
+    console.log(`[URLSCAN] ✓ Step 2 Complete`);
+    console.log(`[URLSCAN] === FINAL STATS ===`);
+    console.log(`[URLSCAN] Total processed: ${processed}/${candidates.length}`);
+    console.log(`[URLSCAN] Validated: ${validated}`);
+    console.log(`[URLSCAN] Malicious found: ${maliciousFound}`);
+    console.log(`[URLSCAN] Clean found: ${cleanFound}`);
+    console.log(`[URLSCAN] Errors: ${errors}`);
+    console.log(`[URLSCAN] API calls made: ${apiCallCount}`);
+    console.log(`[URLSCAN] === VALIDATION RUN COMPLETE ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        processed: processedCount,
+        processed: processed,
+        validated: validated,
+        malicious: maliciousFound,
+        clean: cleanFound,
+        errors: errors,
         api_calls: apiCallCount,
-        message: `Validated ${processedCount} domains using ${apiCallCount} API calls`,
+        message: `Validated ${processed} domains using ${apiCallCount} API calls`,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-    } catch (error: any) {
-      console.error('URLScan validator error:', error);
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-  });
-
+  } catch (error: any) {
+    console.error('[URLSCAN] === ERROR ===', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

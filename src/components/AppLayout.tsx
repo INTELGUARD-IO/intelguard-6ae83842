@@ -62,6 +62,9 @@ export function AppLayout() {
                 <Link to="/ingest-sources" className="text-sm font-medium hover:text-primary transition-colors">
                   Sources
                 </Link>
+                <Link to="/monitoring" className="text-sm font-medium hover:text-primary transition-colors">
+                  Monitoring
+                </Link>
               </>
             )}
           </nav>

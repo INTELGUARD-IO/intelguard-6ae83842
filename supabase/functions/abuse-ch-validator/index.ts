@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   const providedSecret = req.headers.get('x-cron-secret');
   
   if (providedSecret && providedSecret !== secret) {
-    console.error('[abuse-ch-validator] Invalid cron secret');
+    console.error('[ABUSE-CH] Invalid cron secret');
     return new Response('forbidden', { status: 403, headers: corsHeaders });
   }
 
@@ -32,10 +32,10 @@ Deno.serve(async (req) => {
     const abuseChApiKey = Deno.env.get('ABUSE_CH_API_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('[abuse-ch-validator] Starting validation run...');
+    console.log('[ABUSE-CH] === STARTING VALIDATION RUN ===');
 
     // Step 1: Download False Positive List from Abuse.Ch
-    console.log('[abuse-ch-validator] Fetching False Positive List from Abuse.Ch...');
+    console.log('[ABUSE-CH] Step 1: Fetching FP List from Abuse.Ch...');
     const fpResponse = await fetch('https://hunting-api.abuse.ch/api/v1/', {
       method: 'POST',
       headers: {
@@ -53,20 +53,17 @@ Deno.serve(async (req) => {
     }
 
     const fpData = await fpResponse.json();
-    console.log(`[abuse-ch-validator] Received FP list response:`, fpData);
+    console.log(`[ABUSE-CH] Received FP list response with ${fpData?.length || 0} entries`);
 
     // Step 2: Clean expired entries and update FP list in DB
-    console.log('[abuse-ch-validator] Cleaning expired FP entries...');
+    console.log('[ABUSE-CH] Step 2: Cleaning expired FP entries...');
     await supabase.rpc('clean_expired_abuse_ch_fplist');
 
     // Parse and insert new FP list entries
-    // Abuse.Ch returns a list of indicators in various formats
     let fpIndicators: Array<{ indicator: string; kind: string }> = [];
     
     if (fpData && Array.isArray(fpData)) {
-      // Parse the response - adjust based on actual API response format
       fpIndicators = fpData.map((item: any) => {
-        // Determine if it's an IP or domain
         const indicator = typeof item === 'string' ? item : item.indicator || item.value;
         const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(indicator);
         return {
@@ -76,7 +73,7 @@ Deno.serve(async (req) => {
       }).filter(item => item.indicator);
     }
 
-    console.log(`[abuse-ch-validator] Parsed ${fpIndicators.length} FP indicators`);
+    console.log(`[ABUSE-CH] Parsed ${fpIndicators.length} FP indicators`);
 
     // Upsert FP list in batches
     if (fpIndicators.length > 0) {
@@ -90,50 +87,25 @@ Deno.serve(async (req) => {
               indicator: fp.indicator,
               kind: fp.kind,
               added_at: new Date().toISOString(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
             })),
             { onConflict: 'indicator' }
           );
 
         if (fpInsertError) {
-          console.error(`[abuse-ch-validator] Error inserting FP batch:`, fpInsertError);
+          console.error(`[ABUSE-CH] Error inserting FP batch:`, fpInsertError);
         } else {
-          console.log(`[abuse-ch-validator] Inserted/updated FP batch ${i / BATCH_SIZE + 1}`);
+          console.log(`[ABUSE-CH] Inserted/updated FP batch ${i / BATCH_SIZE + 1}`);
         }
       }
     }
 
-    // Step 3: Process raw_indicators and validate against FP list
-    console.log('[abuse-ch-validator] Processing raw indicators...');
-    
-    // Get aggregated indicators with source count (limit to batch processing)
-    const BATCH_LIMIT = 5000;
-    const { data: rawIndicators, error: rawError } = await supabase.rpc(
-      'exec_sql',
-      {
-        query: `
-          SELECT 
-            indicator,
-            kind,
-            COUNT(DISTINCT source) as source_count,
-            ARRAY_AGG(DISTINCT source) as sources
-          FROM raw_indicators
-          WHERE removed_at IS NULL
-            AND NOT EXISTS (
-              SELECT 1 FROM dynamic_raw_indicators dri
-              WHERE dri.indicator = raw_indicators.indicator
-                AND dri.kind = raw_indicators.kind
-                AND dri.last_validated > NOW() - INTERVAL '24 hours'
-            )
-          GROUP BY indicator, kind
-          HAVING COUNT(DISTINCT source) >= 2
-          ORDER BY COUNT(DISTINCT source) DESC
-          LIMIT ${BATCH_LIMIT}
-        `
-      }
-    );
+    console.log(`[ABUSE-CH] ✓ Step 2 Complete: ${fpIndicators.length} FP entries in database`);
 
-    // Alternative: direct query if RPC not available
+    // Step 3: Process raw_indicators and validate against FP list
+    console.log('[ABUSE-CH] Step 3: Fetching raw indicators for processing...');
+    
+    const BATCH_LIMIT = 10000;
     const { data: indicators, error: indicatorsError } = await supabase
       .from('raw_indicators')
       .select('indicator, kind, source')
@@ -141,7 +113,7 @@ Deno.serve(async (req) => {
       .limit(BATCH_LIMIT);
 
     if (indicatorsError) {
-      console.error('[abuse-ch-validator] Error fetching indicators:', indicatorsError);
+      console.error('[ABUSE-CH] Error fetching indicators:', indicatorsError);
       throw indicatorsError;
     }
 
@@ -164,36 +136,45 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[abuse-ch-validator] Processing ${indicatorMap.size} unique indicators`);
+    console.log(`[ABUSE-CH] ✓ Step 3 Complete: Processing ${indicatorMap.size} unique indicators`);
 
     // Step 4: Check against FP list and calculate confidence
+    console.log('[ABUSE-CH] Step 4: Validating indicators against FP list...');
+    let processedCount = 0;
     let validatedCount = 0;
     let skippedFP = 0;
-    let lowConfidence = 0;
+    let skippedLowConfidence = 0;
 
     for (const [key, ind] of indicatorMap.entries()) {
+      processedCount++;
+
       // Check if it's in FP list
       const { data: fpCheck } = await supabase
         .from('abuse_ch_fplist')
         .select('indicator')
         .eq('indicator', ind.indicator)
         .eq('kind', ind.kind)
-        .single();
+        .maybeSingle();
 
       const isFalsePositive = !!fpCheck;
       
       if (isFalsePositive) {
         skippedFP++;
+        console.log(`[ABUSE-CH] ✗ False Positive: ${ind.indicator} (kind: ${ind.kind})`);
         continue;
       }
 
       // Calculate confidence based on source count
       const sourceCount = ind.sources.size;
-      const confidence = Math.min((sourceCount / 3) * 100, 100); // 3+ sources = 100% confidence
+      let confidence = 50;
+      if (sourceCount >= 3) confidence = 100;
+      else if (sourceCount === 2) confidence = 75;
+      else confidence = 50;
 
       // Only include if confidence >= 70%
       if (confidence < 70) {
-        lowConfidence++;
+        skippedLowConfidence++;
+        console.log(`[ABUSE-CH] ⊘ Low Confidence: ${ind.indicator} (confidence: ${confidence}%, sources: ${sourceCount})`);
         continue;
       }
 
@@ -214,29 +195,38 @@ Deno.serve(async (req) => {
         });
 
       if (insertError) {
-        console.error(`[abuse-ch-validator] Error inserting ${ind.indicator}:`, insertError);
+        console.error(`[ABUSE-CH] Error inserting ${ind.indicator}:`, insertError);
       } else {
         validatedCount++;
+        console.log(`[ABUSE-CH] ✓ Validated: ${ind.indicator} (confidence: ${confidence}%, sources: ${sourceCount}, kind: ${ind.kind})`);
       }
 
-      // Rate limiting: small delay every 100 indicators
+      // Progress logging
+      if (processedCount % 100 === 0) {
+        console.log(`[ABUSE-CH] Progress: ${processedCount}/${indicatorMap.size} processed, ${validatedCount} validated`);
+      }
+
+      // Rate limiting
       if (validatedCount % 100 === 0) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
-    console.log(`[abuse-ch-validator] Validation complete:`);
-    console.log(`  - Validated: ${validatedCount}`);
-    console.log(`  - Skipped (FP): ${skippedFP}`);
-    console.log(`  - Skipped (low confidence): ${lowConfidence}`);
+    console.log(`[ABUSE-CH] ✓ Step 4 Complete`);
+    console.log(`[ABUSE-CH] === FINAL STATS ===`);
+    console.log(`[ABUSE-CH] Total processed: ${processedCount}`);
+    console.log(`[ABUSE-CH] False positives skipped: ${skippedFP}`);
+    console.log(`[ABUSE-CH] Low confidence skipped: ${skippedLowConfidence}`);
+    console.log(`[ABUSE-CH] Validated and added: ${validatedCount}`);
+    console.log(`[ABUSE-CH] === VALIDATION RUN COMPLETE ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
         validated: validatedCount,
         skipped_fp: skippedFP,
-        skipped_low_confidence: lowConfidence,
-        total_processed: indicatorMap.size
+        skipped_low_confidence: skippedLowConfidence,
+        total_processed: processedCount
       }),
       {
         status: 200,
@@ -244,7 +234,7 @@ Deno.serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('[abuse-ch-validator] Error:', error);
+    console.error('[ABUSE-CH] === ERROR ===', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

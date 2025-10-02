@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[abuseipdb-validator] Starting validation run...');
+    console.log('[ABUSEIPDB] === STARTING VALIDATION RUN ===');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -34,14 +34,16 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Step 1: Clean expired entries
-    console.log('[abuseipdb-validator] Cleaning expired blacklist entries...');
+    console.log('[ABUSEIPDB] Step 1: Cleaning expired blacklist entries...');
     const { error: cleanError } = await supabase.rpc('clean_expired_abuseipdb_blacklist');
     if (cleanError) {
-      console.error('[abuseipdb-validator] Error cleaning expired entries:', cleanError);
+      console.error('[ABUSEIPDB] Error cleaning expired entries:', cleanError);
+    } else {
+      console.log('[ABUSEIPDB] ✓ Step 1 Complete: Cleaned expired entries');
     }
 
     // Step 2: Fetch AbuseIPDB Blacklist (confidenceMinimum=70)
-    console.log('[abuseipdb-validator] Fetching AbuseIPDB blacklist...');
+    console.log('[ABUSEIPDB] Step 2: Fetching AbuseIPDB blacklist...');
     const blacklistUrl = 'https://api.abuseipdb.com/api/v2/blacklist?confidenceMinimum=70&limit=10000';
     
     const blacklistResponse = await fetch(blacklistUrl, {
@@ -57,10 +59,10 @@ Deno.serve(async (req) => {
     }
 
     const blacklistData: AbuseIPDBBlacklistResponse = await blacklistResponse.json();
-    console.log(`[abuseipdb-validator] Fetched ${blacklistData.data.length} IPs from blacklist`);
+    console.log(`[ABUSEIPDB] Fetched ${blacklistData.data.length} IPs from blacklist`);
 
     // Step 3: Store blacklist in database (batch upsert)
-    console.log('[abuseipdb-validator] Storing blacklist in database...');
+    console.log('[ABUSEIPDB] Step 3: Storing blacklist in database...');
     const BATCH_SIZE = 1000;
     let stored = 0;
 
@@ -77,89 +79,76 @@ Deno.serve(async (req) => {
         .upsert(entries, { onConflict: 'indicator' });
 
       if (upsertError) {
-        console.error('[abuseipdb-validator] Error upserting batch:', upsertError);
+        console.error('[ABUSEIPDB] Error upserting batch:', upsertError);
       } else {
         stored += entries.length;
       }
 
-      // Rate limiting
       if (i + BATCH_SIZE < blacklistData.data.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
-    console.log(`[abuseipdb-validator] Stored ${stored} IPs in blacklist cache`);
+    console.log(`[ABUSEIPDB] ✓ Step 3 Complete: Stored ${stored} IPs in blacklist cache`);
 
     // Step 4: Process raw_indicators and validate against blacklist
-    console.log('[abuseipdb-validator] Processing raw indicators...');
+    console.log('[ABUSEIPDB] Step 4: Processing raw IPv4 indicators...');
     
-    // Aggregate raw indicators by indicator and count sources
-    const BATCH_LIMIT = 5000;
-    const { data: rawIndicators, error: fetchError } = await supabase.rpc('exec_sql', {
-      query: `
-        SELECT 
-          indicator,
-          kind,
-          ARRAY_AGG(DISTINCT source) as sources,
-          COUNT(DISTINCT source) as source_count
-        FROM raw_indicators
-        WHERE removed_at IS NULL
-          AND kind = 'ipv4'
-        GROUP BY indicator, kind
-        LIMIT ${BATCH_LIMIT}
-      `
-    });
+    const BATCH_LIMIT = 10000;
+    const { data: rawIndicators, error: fetchError } = await supabase
+      .from('raw_indicators')
+      .select('indicator, kind, source')
+      .eq('kind', 'ipv4')
+      .is('removed_at', null)
+      .limit(BATCH_LIMIT);
 
     if (fetchError) {
-      console.error('[abuseipdb-validator] Error fetching raw indicators:', fetchError);
-      
-      // Fallback: query directly
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('raw_indicators')
-        .select('indicator, kind, source')
-        .eq('kind', 'ipv4')
-        .is('removed_at', null)
-        .limit(BATCH_LIMIT);
-
-      if (fallbackError) {
-        throw new Error(`Failed to fetch raw indicators: ${fallbackError.message}`);
-      }
-
-      // Manually aggregate
-      const aggregated = new Map<string, { sources: Set<string>; kind: string }>();
-      for (const row of fallbackData || []) {
-        const key = row.indicator;
-        if (!aggregated.has(key)) {
-          aggregated.set(key, { sources: new Set(), kind: row.kind });
-        }
-        aggregated.get(key)!.sources.add(row.source);
-      }
-
-      const aggregatedData = Array.from(aggregated.entries()).map(([indicator, data]) => ({
-        indicator,
-        kind: data.kind,
-        sources: Array.from(data.sources),
-        source_count: data.sources.size,
-      }));
-
-      console.log(`[abuseipdb-validator] Aggregated ${aggregatedData.length} unique indicators`);
-      await processIndicators(supabase, aggregatedData);
-    } else {
-      console.log(`[abuseipdb-validator] Fetched ${rawIndicators?.length || 0} aggregated indicators`);
-      await processIndicators(supabase, rawIndicators || []);
+      throw new Error(`Failed to fetch raw indicators: ${fetchError.message}`);
     }
+
+    // Manually aggregate
+    const aggregated = new Map<string, { sources: Set<string>; kind: string }>();
+    for (const row of rawIndicators || []) {
+      const key = row.indicator;
+      if (!aggregated.has(key)) {
+        aggregated.set(key, { sources: new Set(), kind: row.kind });
+      }
+      aggregated.get(key)!.sources.add(row.source);
+    }
+
+    const aggregatedData = Array.from(aggregated.entries()).map(([indicator, data]) => ({
+      indicator,
+      kind: data.kind,
+      sources: Array.from(data.sources),
+      source_count: data.sources.size,
+    }));
+
+    console.log(`[ABUSEIPDB] ✓ Step 4 Complete: Aggregated ${aggregatedData.length} unique IPv4 indicators`);
+    
+    // Step 5: Validate indicators
+    console.log('[ABUSEIPDB] Step 5: Validating indicators...');
+    const validatedCount = await processIndicators(supabase, aggregatedData);
+    
+    console.log(`[ABUSEIPDB] ✓ Step 5 Complete: Validated ${validatedCount} indicators`);
+    console.log(`[ABUSEIPDB] === FINAL STATS ===`);
+    console.log(`[ABUSEIPDB] Blacklist entries: ${stored}`);
+    console.log(`[ABUSEIPDB] Total processed: ${aggregatedData.length}`);
+    console.log(`[ABUSEIPDB] Validated and added: ${validatedCount}`);
+    console.log(`[ABUSEIPDB] === VALIDATION RUN COMPLETE ===`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         blacklist_count: stored,
+        processed: aggregatedData.length,
+        validated: validatedCount,
         message: 'AbuseIPDB validation completed successfully' 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('[abuseipdb-validator] Error:', error);
+    console.error('[ABUSEIPDB] === ERROR ===', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -170,9 +159,13 @@ Deno.serve(async (req) => {
 async function processIndicators(supabase: any, indicators: any[]) {
   let processed = 0;
   let validated = 0;
+  let skippedLowConfidence = 0;
+  let blacklistHits = 0;
 
   for (const indicator of indicators) {
     try {
+      processed++;
+
       // Check if in AbuseIPDB blacklist
       const { data: blacklistEntry, error: checkError } = await supabase
         .from('abuseipdb_blacklist')
@@ -181,22 +174,23 @@ async function processIndicators(supabase: any, indicators: any[]) {
         .maybeSingle();
 
       if (checkError) {
-        console.error(`[abuseipdb-validator] Error checking blacklist for ${indicator.indicator}:`, checkError);
+        console.error(`[ABUSEIPDB] Error checking blacklist for ${indicator.indicator}:`, checkError);
         continue;
       }
 
       const inBlacklist = !!blacklistEntry;
       const abuseScore = blacklistEntry?.abuse_confidence_score || null;
 
-      // Calculate confidence based on sources and AbuseIPDB score
-      let confidence = 0;
-      if (indicator.source_count >= 3) {
-        confidence = 100;
-      } else if (indicator.source_count === 2) {
-        confidence = 66;
-      } else if (indicator.source_count === 1) {
-        confidence = 33;
+      if (inBlacklist) {
+        blacklistHits++;
+        console.log(`[ABUSEIPDB] ⚠ Blacklist Hit: ${indicator.indicator} (AbuseIPDB score: ${abuseScore})`);
       }
+
+      // Calculate confidence based on sources and AbuseIPDB score
+      let confidence = 50;
+      if (indicator.source_count >= 3) confidence = 100;
+      else if (indicator.source_count === 2) confidence = 75;
+      else confidence = 50;
 
       // Boost confidence if in AbuseIPDB blacklist with high score
       if (inBlacklist && abuseScore && abuseScore >= 70) {
@@ -204,40 +198,46 @@ async function processIndicators(supabase: any, indicators: any[]) {
       }
 
       // Only process if confidence >= 70%
-      if (confidence >= 70) {
-        const { error: upsertError } = await supabase
-          .from('dynamic_raw_indicators')
-          .upsert({
-            indicator: indicator.indicator,
-            kind: indicator.kind,
-            confidence,
-            sources: indicator.sources,
-            source_count: indicator.source_count,
-            last_validated: new Date().toISOString(),
-            abuseipdb_checked: true,
-            abuseipdb_score: abuseScore,
-            abuseipdb_in_blacklist: inBlacklist,
-          }, { onConflict: 'indicator,kind' });
-
-        if (upsertError) {
-          console.error(`[abuseipdb-validator] Error upserting ${indicator.indicator}:`, upsertError);
-        } else {
-          validated++;
-        }
+      if (confidence < 70) {
+        skippedLowConfidence++;
+        console.log(`[ABUSEIPDB] ⊘ Low Confidence: ${indicator.indicator} (confidence: ${confidence}%, sources: ${indicator.source_count})`);
+        continue;
       }
 
-      processed++;
+      const { error: upsertError } = await supabase
+        .from('dynamic_raw_indicators')
+        .upsert({
+          indicator: indicator.indicator,
+          kind: indicator.kind,
+          confidence,
+          sources: indicator.sources,
+          source_count: indicator.source_count,
+          last_validated: new Date().toISOString(),
+          abuseipdb_checked: true,
+          abuseipdb_score: abuseScore,
+          abuseipdb_in_blacklist: inBlacklist,
+        }, { onConflict: 'indicator,kind' });
 
-      // Rate limiting
+      if (upsertError) {
+        console.error(`[ABUSEIPDB] Error upserting ${indicator.indicator}:`, upsertError);
+      } else {
+        validated++;
+        console.log(`[ABUSEIPDB] ✓ Validated: ${indicator.indicator} (confidence: ${confidence}%, sources: ${indicator.source_count}, blacklisted: ${inBlacklist})`);
+      }
+
+      // Progress logging
       if (processed % 100 === 0) {
-        console.log(`[abuseipdb-validator] Processed ${processed}/${indicators.length} indicators`);
+        console.log(`[ABUSEIPDB] Progress: ${processed}/${indicators.length} processed, ${validated} validated`);
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
     } catch (error) {
-      console.error(`[abuseipdb-validator] Error processing ${indicator.indicator}:`, error);
+      console.error(`[ABUSEIPDB] Error processing ${indicator.indicator}:`, error);
     }
   }
 
-  console.log(`[abuseipdb-validator] Validation complete: ${validated}/${processed} indicators validated (>= 70% confidence)`);
+  console.log(`[ABUSEIPDB] Blacklist hits: ${blacklistHits}`);
+  console.log(`[ABUSEIPDB] Low confidence skipped: ${skippedLowConfidence}`);
+  
+  return validated;
 }
