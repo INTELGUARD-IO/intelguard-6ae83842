@@ -41,6 +41,7 @@ const Monitoring = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   
   // Metrics state
   const [rawIndicators, setRawIndicators] = useState(0);
@@ -53,43 +54,79 @@ const Monitoring = () => {
   const [indicatorsByType, setIndicatorsByType] = useState<MetricData[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
 
-  // Check if user is super admin
+  // Check if user is super admin with proper session handling
   useEffect(() => {
-    checkUserRole();
-  }, []);
+    let isMounted = true;
 
-  const checkUserRole = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Non autorizzato",
-          description: "Devi essere autenticato per accedere a questa pagina.",
-          variant: "destructive",
+    const checkSession = async () => {
+      try {
+        // First, check if there's an existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+
+        if (!session) {
+          navigate("/auth");
+          return;
+        }
+
+        // Then verify the user is super admin
+        const { data: isAdmin, error } = await supabase.rpc('is_super_admin', { 
+          _user_id: session.user.id 
         });
-        navigate("/auth");
-        return;
-      }
+        
+        if (!isMounted) return;
 
-      const { data, error } = await supabase.rpc('is_super_admin', { _user_id: user.id });
-      
-      if (error || !data) {
-        toast({
-          title: "Accesso negato",
-          description: "Solo i super admin possono accedere a questa pagina.",
-          variant: "destructive",
-        });
-        navigate("/dashboard");
-        return;
-      }
+        if (error) {
+          console.error('Error checking super admin status:', error);
+          toast({
+            title: "Errore",
+            description: "Impossibile verificare i permessi.",
+            variant: "destructive",
+          });
+          navigate("/dashboard");
+          return;
+        }
 
-      setUserRole('super_admin');
-      loadAllData();
-    } catch (error) {
-      console.error('Error checking user role:', error);
-      navigate("/dashboard");
-    }
-  };
+        if (!isAdmin) {
+          toast({
+            title: "Accesso negato",
+            description: "Solo i super admin possono accedere a questa pagina.",
+            variant: "destructive",
+          });
+          navigate("/dashboard");
+          return;
+        }
+
+        setUserRole('super_admin');
+        setSessionChecked(true);
+        loadAllData();
+      } catch (error) {
+        console.error('Error in session check:', error);
+        if (isMounted) {
+          navigate("/auth");
+        }
+      }
+    };
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+        
+        if (event === 'SIGNED_OUT' || !session) {
+          navigate("/auth");
+        }
+      }
+    );
+
+    checkSession();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate, toast]);
 
   const loadAllData = async () => {
     setLoading(true);
