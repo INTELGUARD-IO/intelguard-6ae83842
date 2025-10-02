@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { supabaseQuery, supabaseRPC } from '../_shared/supabase-rest.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -157,7 +158,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[abuseipdb-validator] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),

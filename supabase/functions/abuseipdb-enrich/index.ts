@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { supabaseQuery } from '../_shared/supabase-rest.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,15 +42,14 @@ Deno.serve(async (req) => {
 
     // Check today's API usage (1000/day limit)
     const today = new Date().toISOString().split('T')[0];
-    const { data: todayChecks, error: countError } = await supabase
+    const { count: todayCount, error: countError } = await supabase
       .from('vendor_checks')
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .eq('vendor', 'abuseipdb')
       .gte('checked_at', `${today}T00:00:00Z`)
       .lte('checked_at', `${today}T23:59:59Z`);
 
-    const todayCount = todayChecks || 0;
-    const remainingQuota = 1000 - todayCount;
+    const remainingQuota = 1000 - (todayCount || 0);
 
     if (remainingQuota <= 0) {
       console.log('[abuseipdb-enrich] Daily quota exhausted (1000/day)');
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           message: 'Daily API quota exhausted',
-          quota_used: todayCount,
+          quota_used: todayCount || 0,
           quota_limit: 1000
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -180,14 +180,14 @@ Deno.serve(async (req) => {
         success: true, 
         enriched,
         errors,
-        quota_used: todayCount + enriched,
+        quota_used: (todayCount || 0) + enriched,
         quota_limit: 1000,
         quota_remaining: remainingQuota - enriched
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[abuseipdb-enrich] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
