@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, RefreshCw, Database, Activity, Clock, TrendingUp } from 'lucide-react';
+import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -117,6 +117,7 @@ export default function System() {
       <Tabs defaultValue="functions" className="space-y-4">
         <TabsList>
           <TabsTrigger value="functions">Edge Functions</TabsTrigger>
+          <TabsTrigger value="validation">Validation Pipeline</TabsTrigger>
           <TabsTrigger value="cron">Cron Jobs</TabsTrigger>
           <TabsTrigger value="logs">Access Logs</TabsTrigger>
         </TabsList>
@@ -258,7 +259,154 @@ export default function System() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Abuse.Ch Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate indicators against Abuse.Ch FP list
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Downloads Abuse.Ch False Positive list and validates raw indicators with 70%+ confidence.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('abuse-ch-validator')}
+                  disabled={loading['abuse-ch-validator']}
+                  className="w-full"
+                  variant="default"
+                >
+                  {loading['abuse-ch-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Validation
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="validation" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Dynamic Raw Indicators</CardTitle>
+                <CardDescription>
+                  High-confidence validated indicators (70%+)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Validated</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { count } = await supabase
+                            .from('dynamic_raw_indicators')
+                            .select('*', { count: 'exact', head: true });
+                          toast.success(`Total: ${count || 0} validated indicators`);
+                        } catch (error: any) {
+                          toast.error(error.message);
+                        }
+                      }}
+                    >
+                      Check Count
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-4">
+                    This table contains indicators that passed Abuse.Ch validation with high confidence scores.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Abuse.Ch FP List</CardTitle>
+                <CardDescription>
+                  False positive indicators cache (7-day TTL)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Cached FP Indicators</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { count } = await supabase
+                            .from('abuse_ch_fplist')
+                            .select('*', { count: 'exact', head: true });
+                          toast.success(`Total: ${count || 0} FP indicators cached`);
+                        } catch (error: any) {
+                          toast.error(error.message);
+                        }
+                      }}
+                    >
+                      Check Count
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-4">
+                    Indicators marked as false positives by Abuse.Ch are cached here to prevent inclusion in validated feeds.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Validation Pipeline Info</CardTitle>
+              <CardDescription>
+                How the Abuse.Ch validation works
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">Step 1: False Positive List Download</div>
+                <div className="text-muted-foreground pl-4">
+                  Downloads latest FP list from Abuse.Ch API and caches it for 7 days.
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">Step 2: Indicator Aggregation</div>
+                <div className="text-muted-foreground pl-4">
+                  Groups raw indicators by value, counting unique sources for each.
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">Step 3: Confidence Calculation</div>
+                <div className="text-muted-foreground pl-4">
+                  Calculates confidence: 3+ sources = 100%, 2 sources = 66%. Minimum 70% required.
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="font-medium">Step 4: FP List Check</div>
+                <div className="text-muted-foreground pl-4">
+                  Indicators in FP list are skipped. Others with 70%+ confidence go to dynamic_raw_indicators.
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="cron" className="space-y-4">
