@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      abuse_ch_fplist: {
+        Row: {
+          added_at: string
+          expires_at: string
+          indicator: string
+          kind: string
+        }
+        Insert: {
+          added_at?: string
+          expires_at?: string
+          indicator: string
+          kind: string
+        }
+        Update: {
+          added_at?: string
+          expires_at?: string
+          indicator?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -64,6 +85,45 @@ export type Database = {
           kind?: string
           removed?: number
           run_date?: string
+        }
+        Relationships: []
+      }
+      dynamic_raw_indicators: {
+        Row: {
+          abuse_ch_checked: boolean
+          abuse_ch_is_fp: boolean | null
+          confidence: number
+          first_validated: string
+          id: number
+          indicator: string
+          kind: string
+          last_validated: string
+          source_count: number
+          sources: string[]
+        }
+        Insert: {
+          abuse_ch_checked?: boolean
+          abuse_ch_is_fp?: boolean | null
+          confidence: number
+          first_validated?: string
+          id?: number
+          indicator: string
+          kind: string
+          last_validated?: string
+          source_count?: number
+          sources: string[]
+        }
+        Update: {
+          abuse_ch_checked?: boolean
+          abuse_ch_is_fp?: boolean | null
+          confidence?: number
+          first_validated?: string
+          id?: number
+          indicator?: string
+          kind?: string
+          last_validated?: string
+          source_count?: number
+          sources?: string[]
         }
         Relationships: []
       }
@@ -485,6 +545,10 @@ export type Database = {
     Functions: {
       _call_edge: {
         Args: { function_name: string }
+        Returns: undefined
+      }
+      clean_expired_abuse_ch_fplist: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       is_super_admin: {
