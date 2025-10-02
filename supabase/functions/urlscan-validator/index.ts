@@ -1,5 +1,3 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -47,6 +45,42 @@ interface URLScanSearchResult {
   total: number;
 }
 
+// Helper function for Supabase REST API calls
+const supabaseQuery = async (
+  url: string,
+  serviceKey: string,
+  table: string,
+  method: string = 'GET',
+  body?: any,
+  query?: string
+) => {
+  const endpoint = `${url}/rest/v1/${table}${query || ''}`;
+  const headers: Record<string, string> = {
+    'apikey': serviceKey,
+    'Authorization': `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+
+  const options: RequestInit = {
+    method,
+    headers,
+  };
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(endpoint, options);
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(`Supabase error: ${JSON.stringify(data)}`);
+  }
+  
+  return data;
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -72,35 +106,31 @@ Deno.serve(async (req) => {
       throw new Error('URLSCAN_API_KEY not configured');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     console.log('Starting URLScan validator...');
 
     // Fetch domains to validate (833 per run, prioritize unchecked and multi-source)
-    const { data: candidates, error: fetchError } = await supabase
-      .from('dynamic_raw_indicators')
-      .select('indicator, kind, source_count, confidence')
-      .eq('kind', 'domain')
-      .eq('urlscan_checked', false)
-      .order('source_count', { ascending: false })
-      .order('confidence', { ascending: false })
-      .limit(833);
-
-    if (fetchError) {
-      console.error('Error fetching candidates:', fetchError);
-      throw fetchError;
-    }
+    const candidates = await supabaseQuery(
+      supabaseUrl,
+      supabaseServiceKey,
+      'dynamic_raw_indicators',
+      'GET',
+      null,
+      '?select=indicator,kind,source_count,confidence&kind=eq.domain&urlscan_checked=eq.false&order=source_count.desc,confidence.desc&limit=833'
+    );
 
     if (!candidates || candidates.length === 0) {
       // If no unchecked domains, refresh oldest checked (cache expiry)
-      const { data: oldChecked, error: oldError } = await supabase
-        .from('vendor_checks')
-        .select('indicator')
-        .eq('vendor', 'urlscan')
-        .lt('checked_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .limit(833);
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const oldChecked = await supabaseQuery(
+        supabaseUrl,
+        supabaseServiceKey,
+        'vendor_checks',
+        'GET',
+        null,
+        `?select=indicator&vendor=eq.urlscan&checked_at=lt.${sevenDaysAgo}&limit=833`
+      );
 
-      if (oldError || !oldChecked || oldChecked.length === 0) {
+      if (!oldChecked || oldChecked.length === 0) {
         console.log('No domains to validate');
         return new Response(
           JSON.stringify({ success: true, message: 'No domains to validate' }),
@@ -109,12 +139,15 @@ Deno.serve(async (req) => {
       }
 
       // Refresh these domains
-      const { data: refreshCandidates } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('indicator, kind, source_count, confidence')
-        .eq('kind', 'domain')
-        .in('indicator', oldChecked.map(d => d.indicator))
-        .limit(833);
+      const indicators = oldChecked.map((d: any) => d.indicator).join(',');
+      const refreshCandidates = await supabaseQuery(
+        supabaseUrl,
+        supabaseServiceKey,
+        'dynamic_raw_indicators',
+        'GET',
+        null,
+        `?select=indicator,kind,source_count,confidence&kind=eq.domain&indicator=in.(${indicators})&limit=833`
+      );
 
       if (!refreshCandidates || refreshCandidates.length === 0) {
         console.log('No domains to refresh');
@@ -259,40 +292,46 @@ Deno.serve(async (req) => {
         maliciousScore = Math.min(maliciousScore, 100);
 
         // Store in vendor_checks
-        const { error: vendorError } = await supabase
-          .from('vendor_checks')
-          .upsert({
-            vendor: 'urlscan',
-            kind: 'domain',
-            indicator: domain,
-            score: maliciousScore,
-            raw: {
-              total_scans: searchData.total,
-              recent_scans: relevantScans.length,
-              malicious_verdicts: relevantScans.filter(s => s.verdict?.overall?.malicious).length,
-              sample_scans: relevantScans.slice(0, 3),
+        try {
+          await supabaseQuery(
+            supabaseUrl,
+            supabaseServiceKey,
+            'vendor_checks',
+            'POST',
+            {
+              vendor: 'urlscan',
+              kind: 'domain',
+              indicator: domain,
+              score: maliciousScore,
+              raw: {
+                total_scans: searchData.total,
+                recent_scans: relevantScans.length,
+                malicious_verdicts: relevantScans.filter(s => s.verdict?.overall?.malicious).length,
+                sample_scans: relevantScans.slice(0, 3),
+              },
+              checked_at: new Date().toISOString(),
             },
-            checked_at: new Date().toISOString(),
-          }, {
-            onConflict: 'vendor,kind,indicator',
-          });
-
-        if (vendorError) {
+            '?on_conflict=vendor,kind,indicator'
+          );
+        } catch (vendorError) {
           console.error(`Error storing vendor check for ${domain}:`, vendorError);
         }
 
         // Update dynamic_raw_indicators
-        const { error: updateError } = await supabase
-          .from('dynamic_raw_indicators')
-          .update({
-            urlscan_checked: true,
-            urlscan_score: maliciousScore,
-            urlscan_malicious: isMalicious,
-          })
-          .eq('indicator', domain)
-          .eq('kind', 'domain');
-
-        if (updateError) {
+        try {
+          await supabaseQuery(
+            supabaseUrl,
+            supabaseServiceKey,
+            'dynamic_raw_indicators',
+            'PATCH',
+            {
+              urlscan_checked: true,
+              urlscan_score: maliciousScore,
+              urlscan_malicious: isMalicious,
+            },
+            `?indicator=eq.${encodeURIComponent(domain)}&kind=eq.domain`
+          );
+        } catch (updateError) {
           console.error(`Error updating indicator ${domain}:`, updateError);
         }
 
