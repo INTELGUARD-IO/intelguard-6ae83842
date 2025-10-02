@@ -32,32 +32,81 @@ Deno.serve(async (req) => {
 
     console.log('[schedule-validations] Starting scheduling run...');
 
-    // TODO: Query raw_indicators for items updated in last 24 hours
-    // that don't already have a PENDING job in validation_jobs
-    //
-    // Steps:
-    // 1. SELECT DISTINCT indicator, kind FROM raw_indicators
-    //    WHERE last_seen > now() - interval '24 hours'
-    // 2. LEFT JOIN validation_jobs vj ON (indicator, kind) 
-    //    WHERE vj.id IS NULL OR vj.status != 'PENDING'
-    // 3. Deduplicate to ensure one job per (indicator, kind)
-    // 4. Cap to 100 jobs per run (rate limiting)
-    // 5. INSERT INTO validation_jobs (indicator, kind, status, scheduled_at)
-    //
-    // Example query structure:
-    // const { data: candidates, error: fetchError } = await supabase
-    //   .from('raw_indicators')
-    //   .select('indicator, kind')
-    //   .gte('last_seen', new Date(Date.now() - 24*60*60*1000).toISOString())
-    //   .limit(100);
-
-    const candidates: Array<{ indicator: string; kind: string }> = [];
+    // Step 1: Get distinct indicators from last 24h that are not removed
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     
-    console.log('[schedule-validations] TODO: Query raw_indicators for candidates');
+    const { data: recentIndicators, error: fetchError } = await supabase
+      .from('raw_indicators')
+      .select('indicator, kind')
+      .gte('last_seen', twentyFourHoursAgo)
+      .is('removed_at', null);
+
+    if (fetchError) {
+      console.error('[schedule-validations] Error fetching recent indicators:', fetchError);
+      throw fetchError;
+    }
+
+    console.log(`[schedule-validations] Found ${recentIndicators?.length || 0} recent indicators`);
+
+    if (!recentIndicators || recentIndicators.length === 0) {
+      console.log('[schedule-validations] No recent indicators to validate');
+      return new Response(
+        JSON.stringify({ success: true, scheduled: 0, message: 'No recent indicators found' }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Step 2: Deduplicate indicators
+    const uniqueIndicators = new Map<string, { indicator: string; kind: string }>();
+    for (const item of recentIndicators) {
+      const key = `${item.indicator}::${item.kind}`;
+      if (!uniqueIndicators.has(key)) {
+        uniqueIndicators.set(key, item);
+      }
+    }
+
+    console.log(`[schedule-validations] Deduplicated to ${uniqueIndicators.size} unique indicators`);
+
+    // Step 3: Filter out indicators that already have PENDING jobs
+    const { data: pendingJobs, error: jobsError } = await supabase
+      .from('validation_jobs')
+      .select('indicator, kind')
+      .eq('status', 'PENDING');
+
+    if (jobsError) {
+      console.error('[schedule-validations] Error fetching pending jobs:', jobsError);
+      throw jobsError;
+    }
+
+    const pendingSet = new Set<string>();
+    if (pendingJobs) {
+      for (const job of pendingJobs) {
+        pendingSet.add(`${job.indicator}::${job.kind}`);
+      }
+    }
+
+    console.log(`[schedule-validations] Found ${pendingSet.size} existing PENDING jobs`);
+
+    // Step 4: Create candidates list excluding pending jobs
+    const candidates: Array<{ indicator: string; kind: string }> = [];
+    for (const [key, value] of uniqueIndicators.entries()) {
+      if (!pendingSet.has(key)) {
+        candidates.push(value);
+      }
+    }
+
+    // Step 5: Cap to 100 jobs per run for rate limiting
+    const maxJobsPerRun = 100;
+    const jobsToSchedule = candidates.slice(0, maxJobsPerRun);
+    
+    console.log(`[schedule-validations] Scheduling ${jobsToSchedule.length} new validation jobs (${candidates.length} total candidates, capped at ${maxJobsPerRun})`);
 
     // Create validation jobs
-    if (candidates.length > 0) {
-      const jobs = candidates.map(c => ({
+    if (jobsToSchedule.length > 0) {
+      const jobs = jobsToSchedule.map(c => ({
         indicator: c.indicator,
         kind: c.kind,
         status: 'PENDING',
@@ -80,7 +129,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, scheduled: candidates.length }),
+      JSON.stringify({ success: true, scheduled: jobsToSchedule.length }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
