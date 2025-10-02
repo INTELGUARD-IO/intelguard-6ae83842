@@ -127,6 +127,9 @@ export type Database = {
           last_validated: string
           source_count: number
           sources: string[]
+          urlscan_checked: boolean
+          urlscan_malicious: boolean | null
+          urlscan_score: number | null
         }
         Insert: {
           abuse_ch_checked?: boolean
@@ -142,6 +145,9 @@ export type Database = {
           last_validated?: string
           source_count?: number
           sources: string[]
+          urlscan_checked?: boolean
+          urlscan_malicious?: boolean | null
+          urlscan_score?: number | null
         }
         Update: {
           abuse_ch_checked?: boolean
@@ -157,6 +163,9 @@ export type Database = {
           last_validated?: string
           source_count?: number
           sources?: string[]
+          urlscan_checked?: boolean
+          urlscan_malicious?: boolean | null
+          urlscan_score?: number | null
         }
         Relationships: []
       }

@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.manual-ingest]
 verify_jwt = false
+
+[functions.urlscan-validator]
+verify_jwt = false
