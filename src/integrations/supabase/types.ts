@@ -35,6 +35,30 @@ export type Database = {
         }
         Relationships: []
       }
+      abuseipdb_blacklist: {
+        Row: {
+          abuse_confidence_score: number
+          added_at: string
+          expires_at: string
+          indicator: string
+          last_reported_at: string
+        }
+        Insert: {
+          abuse_confidence_score: number
+          added_at?: string
+          expires_at?: string
+          indicator: string
+          last_reported_at: string
+        }
+        Update: {
+          abuse_confidence_score?: number
+          added_at?: string
+          expires_at?: string
+          indicator?: string
+          last_reported_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -92,6 +116,9 @@ export type Database = {
         Row: {
           abuse_ch_checked: boolean
           abuse_ch_is_fp: boolean | null
+          abuseipdb_checked: boolean
+          abuseipdb_in_blacklist: boolean | null
+          abuseipdb_score: number | null
           confidence: number
           first_validated: string
           id: number
@@ -104,6 +131,9 @@ export type Database = {
         Insert: {
           abuse_ch_checked?: boolean
           abuse_ch_is_fp?: boolean | null
+          abuseipdb_checked?: boolean
+          abuseipdb_in_blacklist?: boolean | null
+          abuseipdb_score?: number | null
           confidence: number
           first_validated?: string
           id?: number
@@ -116,6 +146,9 @@ export type Database = {
         Update: {
           abuse_ch_checked?: boolean
           abuse_ch_is_fp?: boolean | null
+          abuseipdb_checked?: boolean
+          abuseipdb_in_blacklist?: boolean | null
+          abuseipdb_score?: number | null
           confidence?: number
           first_validated?: string
           id?: number
@@ -548,6 +581,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_abuse_ch_fplist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_abuseipdb_blacklist: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

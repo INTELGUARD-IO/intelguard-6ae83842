@@ -3,6 +3,12 @@ project_id = "qmsidlazqaqwcptpsjqh"
 [functions.abuse-ch-validator]
 verify_jwt = false
 
+[functions.abuseipdb-validator]
+verify_jwt = false
+
+[functions.abuseipdb-enrich]
+verify_jwt = false
+
 [functions.feed]
 verify_jwt = false
 

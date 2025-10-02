@@ -294,6 +294,76 @@ export default function System() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  AbuseIPDB Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate against AbuseIPDB Blacklist (≥70%)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Downloads AbuseIPDB blacklist and cross-validates indicators with high confidence scores.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('abuseipdb-validator')}
+                  disabled={loading['abuseipdb-validator']}
+                  className="w-full"
+                  variant="default"
+                >
+                  {loading['abuseipdb-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Validation
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  AbuseIPDB Enrichment
+                </CardTitle>
+                <CardDescription>
+                  Enrich IPs with ISP, country data (1000/day)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Fetches detailed IP information from AbuseIPDB API. Limited to 1000 checks per day.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('abuseipdb-enrich')}
+                  disabled={loading['abuseipdb-enrich']}
+                  className="w-full"
+                  variant="secondary"
+                >
+                  {loading['abuseipdb-enrich'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Enriching...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Enrichment
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -368,41 +438,120 @@ export default function System() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>AbuseIPDB Blacklist</CardTitle>
+                <CardDescription>
+                  High-confidence malicious IPs (6-hour TTL)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Blacklisted IPs</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { count } = await supabase
+                            .from('abuseipdb_blacklist')
+                            .select('*', { count: 'exact', head: true });
+                          toast.success(`Total: ${count || 0} IPs in blacklist`);
+                        } catch (error: any) {
+                          toast.error(error.message);
+                        }
+                      }}
+                    >
+                      Check Count
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-4">
+                    IPs with abuse confidence score ≥70% from AbuseIPDB, cached for 6 hours.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendor Checks</CardTitle>
+                <CardDescription>
+                  Enriched IP metadata (ISP, country, ASN)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Enriched IPs</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { count } = await supabase
+                            .from('vendor_checks')
+                            .select('*', { count: 'exact', head: true });
+                          toast.success(`Total: ${count || 0} IPs enriched`);
+                        } catch (error: any) {
+                          toast.error(error.message);
+                        }
+                      }}
+                    >
+                      Check Count
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-4">
+                    Detailed IP information from external vendors for dashboard analytics.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle>Validation Pipeline Info</CardTitle>
               <CardDescription>
-                How the Abuse.Ch validation works
+                Multi-stage cross-validation process
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2 text-sm">
-                <div className="font-medium">Step 1: False Positive List Download</div>
+                <div className="font-medium">Stage 1: Abuse.Ch Validation</div>
                 <div className="text-muted-foreground pl-4">
-                  Downloads latest FP list from Abuse.Ch API and caches it for 7 days.
+                  • Downloads False Positive list (7-day cache)<br/>
+                  • Aggregates raw indicators by source count<br/>
+                  • Calculates confidence: 3+ sources = 100%, 2 = 66%<br/>
+                  • Filters out FPs, keeps 70%+ confidence
                 </div>
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="font-medium">Step 2: Indicator Aggregation</div>
+                <div className="font-medium">Stage 2: AbuseIPDB Validation</div>
                 <div className="text-muted-foreground pl-4">
-                  Groups raw indicators by value, counting unique sources for each.
+                  • Fetches blacklist (confidenceMinimum=70%, 6-hour cache)<br/>
+                  • Cross-validates indicators against blacklist<br/>
+                  • Boosts confidence if in blacklist with high score<br/>
+                  • Updates dynamic_raw_indicators with validation status
                 </div>
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="font-medium">Step 3: Confidence Calculation</div>
+                <div className="font-medium">Stage 3: IP Enrichment</div>
                 <div className="text-muted-foreground pl-4">
-                  Calculates confidence: 3+ sources = 100%, 2 sources = 66%. Minimum 70% required.
+                  • Enriches top indicators with AbuseIPDB Check API<br/>
+                  • Fetches ISP, country, usage type, ASN data<br/>
+                  • Rate limited to 1000 checks per day<br/>
+                  • Stores in vendor_checks for dashboard analytics
                 </div>
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="font-medium">Step 4: FP List Check</div>
+                <div className="font-medium">Final Output</div>
                 <div className="text-muted-foreground pl-4">
-                  Indicators in FP list are skipped. Others with 70%+ confidence go to dynamic_raw_indicators.
+                  Only indicators passing all validations with ≥70% confidence enter dynamic_raw_indicators table for customer feeds.
                 </div>
               </div>
             </CardContent>
