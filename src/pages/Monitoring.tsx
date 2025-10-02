@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, AlertCircle, CheckCircle, Clock, Database, PlayCircle, RefreshCw, XCircle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 interface MetricData {
   label: string;
@@ -297,6 +298,19 @@ const Monitoring = () => {
 
   const COLORS = ['#06B6D4', '#8B5CF6', '#10B981', '#F59E0B'];
 
+  const pieChartConfig = {
+    value: {
+      label: "Indicatori",
+    },
+  };
+
+  const barChartConfig = {
+    count: {
+      label: "Conteggio",
+      color: "hsl(var(--primary))",
+    },
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -376,7 +390,7 @@ const Monitoring = () => {
                 <CardDescription>Distribuzione degli indicatori raw per categoria</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ChartContainer config={pieChartConfig} className="h-[300px]">
                   <PieChart>
                     <Pie
                       data={indicatorsByType}
@@ -392,9 +406,9 @@ const Monitoring = () => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <ChartTooltip content={<ChartTooltipContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
             </Card>
 
@@ -404,7 +418,7 @@ const Monitoring = () => {
                 <CardDescription>Flusso di elaborazione indicatori</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ChartContainer config={barChartConfig} className="h-[300px]">
                   <BarChart
                     data={[
                       { stage: 'Raw', count: rawIndicators },
@@ -415,10 +429,10 @@ const Monitoring = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="stage" />
                     <YAxis />
-                    <Tooltip />
+                    <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="count" fill="#06B6D4" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
             </Card>
           </div>
