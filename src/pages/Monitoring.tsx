@@ -578,6 +578,13 @@ const Monitoring = () => {
                       </TableCell>
                     </TableRow>
                   ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell colSpan={3} className="text-right">Totale Indicatori:</TableCell>
+                    <TableCell>
+                      {ingestSources.reduce((sum, source) => sum + (source.indicators_count || 0), 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
