@@ -51,7 +51,7 @@ export default function IngestSources() {
     description: '',
   });
 
-  const loadSources = async () => {
+  async function loadSources() {
     try {
       const { data, error } = await supabase
         .from('ingest_sources')
@@ -84,7 +84,7 @@ export default function IngestSources() {
     return null;
   }
 
-  const toggleSource = async (id: string, enabled: boolean) => {
+  async function toggleSource(id: string, enabled: boolean) {
     try {
       const { error } = await supabase
         .from('ingest_sources')
@@ -100,7 +100,7 @@ export default function IngestSources() {
     }
   };
 
-  const deleteSource = async (id: string) => {
+  async function deleteSource(id: string) {
     if (!confirm('Are you sure you want to delete this source?')) return;
 
     try {
@@ -118,7 +118,7 @@ export default function IngestSources() {
     }
   };
 
-  const addSource = async () => {
+  async function addSource() {
     if (!newSource.name || !newSource.url) {
       toast.error('Name and URL are required');
       return;
@@ -174,7 +174,7 @@ export default function IngestSources() {
     setUploadConfig({ ...uploadConfig, file });
   };
 
-  const handleManualUpload = async () => {
+  async function handleManualUpload() {
     if (!uploadConfig.file || !uploadConfig.sourceName) {
       toast.error('Please select a file and provide a source name');
       return;
