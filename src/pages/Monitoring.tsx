@@ -33,6 +33,7 @@ interface IngestSource {
   last_run: string | null;
   last_success: string | null;
   indicators_count: number;
+  real_indicators_count?: number;
   last_error: string | null;
 }
 
@@ -81,6 +82,7 @@ const Monitoring = () => {
     issues: [],
     metrics: { pendingJobs: 0, failedJobs: 0, successRate: 100, lastValidation: null }
   });
+  const [previousHealthStatus, setPreviousHealthStatus] = useState<'healthy' | 'warning' | 'critical'>('healthy');
 
   // Check if user is super admin with proper session handling
   useEffect(() => {
@@ -248,13 +250,34 @@ const Monitoring = () => {
 
   const loadIngestSources = async () => {
     try {
+      // Get ingest sources
       const { data, error } = await supabase
         .from('ingest_sources')
         .select('*')
         .order('name');
 
       if (data) {
-        setIngestSources(data);
+        // Get real count from raw_indicators for each source
+        const { data: rawCounts } = await supabase
+          .from('raw_indicators')
+          .select('source')
+          .is('removed_at', null);
+
+        // Count indicators by source
+        const countsBySource: Record<string, number> = {};
+        if (rawCounts) {
+          rawCounts.forEach(row => {
+            countsBySource[row.source] = (countsBySource[row.source] || 0) + 1;
+          });
+        }
+
+        // Merge real counts with ingest sources
+        const enrichedSources = data.map(source => ({
+          ...source,
+          real_indicators_count: countsBySource[source.name] || 0
+        }));
+
+        setIngestSources(enrichedSources);
       }
     } catch (error) {
       console.error('Error loading ingest sources:', error);
@@ -410,14 +433,17 @@ const Monitoring = () => {
         if (status === 'healthy') status = 'warning';
       }
 
-      // Show alerts
-      if (status === 'critical' && issues.length > 0) {
+      // Show alerts only when status changes from healthy/warning to critical
+      if (status === 'critical' && previousHealthStatus !== 'critical' && issues.length > 0) {
         toast({
           title: "⚠️ Alert Critico",
           description: issues.join('\n'),
           variant: "destructive",
         });
       }
+
+      // Update previous status
+      setPreviousHealthStatus(status);
 
       setSystemHealth({
         status,
@@ -965,43 +991,64 @@ const Monitoring = () => {
                     <TableHead>Nome</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Stato</TableHead>
-                    <TableHead>Indicatori</TableHead>
+                    <TableHead>Indicatori (DB)</TableHead>
+                    <TableHead>Indicatori (Config)</TableHead>
                     <TableHead>Ultima Esecuzione</TableHead>
                     <TableHead>Ultimo Successo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ingestSources.map((source) => (
-                    <TableRow key={source.id}>
-                      <TableCell className="font-medium">{source.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{source.kind}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {source.enabled ? (
-                          <Badge className="bg-accent">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Attivo
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Disabilitato
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{source.indicators_count?.toLocaleString() || 0}</TableCell>
-                      <TableCell>
-                        {source.last_run ? new Date(source.last_run).toLocaleString('it-IT') : 'Mai'}
-                      </TableCell>
-                      <TableCell>
-                        {source.last_success ? new Date(source.last_success).toLocaleString('it-IT') : 'Mai'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {ingestSources.map((source) => {
+                    const realCount = source.real_indicators_count || 0;
+                    const configCount = source.indicators_count || 0;
+                    const hasMismatch = realCount !== configCount;
+                    
+                    return (
+                      <TableRow key={source.id}>
+                        <TableCell className="font-medium">{source.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{source.kind}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {source.enabled ? (
+                            <Badge className="bg-accent">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Attivo
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Disabilitato
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className={hasMismatch ? 'text-primary font-bold' : ''}>
+                            {realCount.toLocaleString()}
+                          </span>
+                          {hasMismatch && <span className="text-xs text-muted-foreground ml-1">✓ Reale</span>}
+                        </TableCell>
+                        <TableCell>
+                          <span className={hasMismatch ? 'text-muted-foreground line-through' : ''}>
+                            {configCount.toLocaleString()}
+                          </span>
+                          {hasMismatch && <span className="text-xs text-destructive ml-1">⚠️ Obsoleto</span>}
+                        </TableCell>
+                        <TableCell>
+                          {source.last_run ? new Date(source.last_run).toLocaleString('it-IT') : 'Mai'}
+                        </TableCell>
+                        <TableCell>
+                          {source.last_success ? new Date(source.last_success).toLocaleString('it-IT') : 'Mai'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3} className="text-right">Totale Indicatori:</TableCell>
-                    <TableCell>
+                    <TableCell colSpan={3} className="text-right">Totale Indicatori (DB Reale):</TableCell>
+                    <TableCell className="text-primary">
+                      {ingestSources.reduce((sum, source) => sum + (source.real_indicators_count || 0), 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
                       {ingestSources.reduce((sum, source) => sum + (source.indicators_count || 0), 0).toLocaleString()}
                     </TableCell>
                     <TableCell colSpan={2}></TableCell>
