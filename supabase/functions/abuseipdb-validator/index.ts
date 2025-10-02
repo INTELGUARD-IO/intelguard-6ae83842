@@ -187,18 +187,18 @@ async function processIndicators(supabase: any, indicators: any[]) {
       }
 
       // Calculate confidence based on sources and AbuseIPDB score
-      let confidence = 50;
+      let confidence = 60; // Single source gets 60%
       if (indicator.source_count >= 3) confidence = 100;
       else if (indicator.source_count === 2) confidence = 75;
-      else confidence = 50;
+      else confidence = 60;
 
       // Boost confidence if in AbuseIPDB blacklist with high score
       if (inBlacklist && abuseScore && abuseScore >= 70) {
         confidence = Math.max(confidence, abuseScore);
       }
 
-      // Only process if confidence >= 70%
-      if (confidence < 70) {
+      // Only process if confidence >= 50% (lowered threshold to populate initial data)
+      if (confidence < 50) {
         skippedLowConfidence++;
         console.log(`[ABUSEIPDB] ⊘ Low Confidence: ${indicator.indicator} (confidence: ${confidence}%, sources: ${indicator.source_count})`);
         continue;

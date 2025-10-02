@@ -199,12 +199,12 @@ export default function System() {
                   Run Validations
                 </CardTitle>
                 <CardDescription>
-                  Execute pending validation jobs
+                  Process pending validation jobs
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Processes validation jobs and updates indicator confidence scores.
+                  Executes queued validation tasks against vendor APIs.
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('run-validations')}
@@ -229,56 +229,21 @@ export default function System() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Daily Delta
-                </CardTitle>
-                <CardDescription>
-                  Calculate daily indicator changes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Compares today's indicators vs yesterday to track changes.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('daily-delta')}
-                  disabled={loading['daily-delta']}
-                  className="w-full"
-                >
-                  {loading['daily-delta'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Test Delta
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
-                  Abuse.Ch Validator
+                  Abuse.ch Validator
                 </CardTitle>
                 <CardDescription>
-                  Validate indicators against Abuse.Ch FP list
+                  Validate against Abuse.ch False Positive list
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Downloads Abuse.Ch False Positive list and validates raw indicators with 70%+ confidence.
+                  Checks indicators against Abuse.ch FP list and populates dynamic_raw_indicators.
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('abuse-ch-validator')}
                   disabled={loading['abuse-ch-validator']}
                   className="w-full"
-                  variant="default"
                 >
                   {loading['abuse-ch-validator'] ? (
                     <>
@@ -288,7 +253,7 @@ export default function System() {
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
-                      Run Validation
+                      Run Abuse.ch
                     </>
                   )}
                 </Button>
@@ -302,18 +267,17 @@ export default function System() {
                   AbuseIPDB Validator
                 </CardTitle>
                 <CardDescription>
-                  Validate against AbuseIPDB Blacklist (≥70%)
+                  Validate IPv4 against AbuseIPDB blacklist
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Downloads AbuseIPDB blacklist and cross-validates indicators with high confidence scores.
+                  Checks IPs against AbuseIPDB blacklist and validates indicators.
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('abuseipdb-validator')}
                   disabled={loading['abuseipdb-validator']}
                   className="w-full"
-                  variant="default"
                 >
                   {loading['abuseipdb-validator'] ? (
                     <>
@@ -323,7 +287,7 @@ export default function System() {
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
-                      Run Validation
+                      Run AbuseIPDB
                     </>
                   )}
                 </Button>
@@ -333,32 +297,31 @@ export default function System() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  AbuseIPDB Enrichment
+                  <Shield className="h-5 w-5" />
+                  URLScan Validator
                 </CardTitle>
                 <CardDescription>
-                  Enrich IPs with ISP, country data (1000/day)
+                  Validate domains against URLScan.io
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Fetches detailed IP information from AbuseIPDB API. Limited to 1000 checks per day.
+                  Checks domains for malicious activity via URLScan.io API.
                 </div>
                 <Button
-                  onClick={() => testEdgeFunction('abuseipdb-enrich')}
-                  disabled={loading['abuseipdb-enrich']}
+                  onClick={() => testEdgeFunction('urlscan-validator')}
+                  disabled={loading['urlscan-validator']}
                   className="w-full"
-                  variant="secondary"
                 >
-                  {loading['abuseipdb-enrich'] ? (
+                  {loading['urlscan-validator'] ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Enriching...
+                      Running...
                     </>
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
-                      Run Enrichment
+                      Run URLScan
                     </>
                   )}
                 </Button>

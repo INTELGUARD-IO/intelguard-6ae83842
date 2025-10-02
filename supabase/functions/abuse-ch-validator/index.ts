@@ -169,10 +169,10 @@ Deno.serve(async (req) => {
       let confidence = 50;
       if (sourceCount >= 3) confidence = 100;
       else if (sourceCount === 2) confidence = 75;
-      else confidence = 50;
+      else confidence = 60; // Single source gets 60%
 
-      // Only include if confidence >= 70%
-      if (confidence < 70) {
+      // Only include if confidence >= 50% (lowered threshold to populate initial data)
+      if (confidence < 50) {
         skippedLowConfidence++;
         console.log(`[ABUSE-CH] ⊘ Low Confidence: ${ind.indicator} (confidence: ${confidence}%, sources: ${sourceCount})`);
         continue;
