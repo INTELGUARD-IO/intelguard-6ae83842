@@ -51,21 +51,6 @@ export default function IngestSources() {
     description: '',
   });
 
-  useEffect(() => {
-    loadSources();
-  }, []);
-
-  useEffect(() => {
-    if (!roleLoading && !isSuperAdmin) {
-      navigate('/dashboard');
-      toast.error('Access denied: Super admin only');
-    }
-  }, [isSuperAdmin, roleLoading, navigate]);
-
-  if (roleLoading) {
-    return null;
-  }
-
   const loadSources = async () => {
     try {
       const { data, error } = await supabase
@@ -83,6 +68,21 @@ export default function IngestSources() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadSources();
+  }, []);
+
+  useEffect(() => {
+    if (!roleLoading && !isSuperAdmin) {
+      navigate('/dashboard');
+      toast.error('Access denied: Super admin only');
+    }
+  }, [isSuperAdmin, roleLoading, navigate]);
+
+  if (roleLoading) {
+    return null;
+  }
 
   const toggleSource = async (id: string, enabled: boolean) => {
     try {
