@@ -156,27 +156,26 @@ const Monitoring = () => {
 
   const loadCronJobs = async () => {
     try {
-      const { data, error } = await supabase.rpc('is_super_admin', { _user_id: (await supabase.auth.getUser()).data.user?.id });
+      // Use the new get_cron_jobs function to retrieve real CRON jobs
+      const { data, error } = await supabase.rpc('get_cron_jobs');
       
+      if (error) {
+        console.error('Error fetching CRON jobs:', error);
+        setCronJobs([]);
+        return;
+      }
+
       if (data) {
-        // Query cron.job table directly using raw SQL
-        const cronQuery = await supabase
-          .from('pg_cron_jobs' as any)
-          .select('*');
-        
-        // Mock data for now since we can't query cron.job directly
-        setCronJobs([
-          { jobname: 'invoke-ingest-every-hour', schedule: '0 * * * *', active: true, jobid: 1 },
-          { jobname: 'invoke-abuse-ch-validator-every-6-hours', schedule: '0 */6 * * *', active: true, jobid: 2 },
-          { jobname: 'invoke-abuseipdb-validator-every-6-hours', schedule: '0 */6 * * *', active: true, jobid: 3 },
-          { jobname: 'invoke-urlscan-validator-daily', schedule: '0 2 * * *', active: true, jobid: 4 },
-          { jobname: 'invoke-abuseipdb-enrich-every-12-hours', schedule: '0 */12 * * *', active: true, jobid: 5 },
-          { jobname: 'invoke-daily-delta-at-midnight', schedule: '0 0 * * *', active: true, jobid: 6 },
-          { jobname: 'invoke-email-dispatch-at-9am', schedule: '0 9 * * *', active: true, jobid: 7 },
-        ]);
+        setCronJobs(data.map((job: any) => ({
+          jobname: job.jobname,
+          schedule: job.schedule,
+          active: job.active,
+          jobid: job.jobid,
+        })));
       }
     } catch (error) {
       console.error('Error loading cron jobs:', error);
+      setCronJobs([]);
     }
   };
 
