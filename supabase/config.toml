@@ -3,6 +3,9 @@ project_id = "qmsidlazqaqwcptpsjqh"
 [functions.abuse-ch-validator]
 verify_jwt = false
 
+[functions.source-health-check]
+verify_jwt = false
+
 [functions.abuseipdb-validator]
 verify_jwt = false
 

@@ -361,6 +361,40 @@ export default function System() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Source Health Check
+                </CardTitle>
+                <CardDescription>
+                  Check health of all ingest sources
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Tests connectivity for all sources and re-enables those that are back online.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('source-health-check')}
+                  disabled={loading['source-health-check']}
+                  className="w-full"
+                >
+                  {loading['source-health-check'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Check Sources
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

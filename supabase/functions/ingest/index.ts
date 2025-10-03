@@ -30,6 +30,17 @@ const isIPv4 = (s: string) =>
 const isDomain = (s: string) =>
   /^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,}$/i.test(s.trim());
 
+// Helper per estrarre dominio da URL completi
+function extractDomain(input: string): string | null {
+  try {
+    const url = new URL(input.startsWith('http') ? input : `http://${input}`);
+    return url.hostname;
+  } catch {
+    // Se fallisce il parsing, restituisci input originale
+    return input;
+  }
+}
+
 // Stream processing with line-by-line reading for large files
 async function* fetchTextStream(url: string, timeoutMs = 120000): AsyncGenerator<string> {
   const ctrl = new AbortController();
@@ -76,18 +87,39 @@ function normalizeLine(
   kind: 'ipv4' | 'domain',
   source: string,
 ): { indicator: string; kind: 'ipv4' | 'domain'; source: string } | null {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) return null;
+  let trimmed = line.trim();
+  
+  // Rimuovi commenti inline (es: "1.2.3.4 # comment")
+  if (trimmed.includes('#')) {
+    trimmed = trimmed.split('#')[0].trim();
+  }
+  if (!trimmed || trimmed.startsWith(';')) return null;
 
-  // hostfile: prendi la prima colonna (di solito IP o dominio)
-  const firstCol = trimmed.split(/\s+/)[0];
+  // Gestisci separatori multipli: spazi, tab, virgole
+  const columns = trimmed.split(/[\s,]+/);
+  const firstCol = columns[0];
 
   if (kind === 'ipv4') {
     if (isIPv4(firstCol)) return { indicator: firstCol, kind, source };
   } else {
-    // domini sempre in lowercase
-    const dom = firstCol.toLowerCase();
-    if (isDomain(dom)) return { indicator: dom, kind, source };
+    // DOMINIO: controlla se prima colonna è IPv4 (formato hostfile)
+    if (isIPv4(firstCol) && columns.length > 1) {
+      // È un hostfile tipo "127.0.0.1 malicious.com"
+      // Prendi la seconda colonna (dominio)
+      const dom = columns[1].toLowerCase();
+      if (isDomain(dom)) return { indicator: dom, kind, source };
+    } else {
+      // Formato normale: prendi prima colonna
+      let domain = firstCol.toLowerCase();
+      
+      // Se sembra un URL completo, estrai il dominio
+      if (domain.startsWith('http://') || domain.startsWith('https://')) {
+        const extracted = extractDomain(domain);
+        if (extracted) domain = extracted;
+      }
+      
+      if (isDomain(domain)) return { indicator: domain, kind, source };
+    }
   }
   return null;
 }
