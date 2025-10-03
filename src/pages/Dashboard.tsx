@@ -26,14 +26,14 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      // Get total validated indicators by kind
-      const { data: ipv4Data } = await supabase
-        .from('validated_indicators')
+      // Get total validated indicators by kind from dynamic_raw_indicators
+      const { data: ipv4Data, count: ipv4Count } = await supabase
+        .from('dynamic_raw_indicators')
         .select('indicator', { count: 'exact', head: true })
         .eq('kind', 'ipv4');
 
-      const { data: domainData } = await supabase
-        .from('validated_indicators')
+      const { data: domainData, count: domainCount } = await supabase
+        .from('dynamic_raw_indicators')
         .select('indicator', { count: 'exact', head: true })
         .eq('kind', 'domain');
 
@@ -44,8 +44,8 @@ export default function Dashboard() {
         .order('run_date', { ascending: false })
         .limit(2);
 
-      const ipv4Count = ipv4Data?.length || 0;
-      const domainCount = domainData?.length || 0;
+      const totalIpv4 = ipv4Count || 0;
+      const totalDomain = domainCount || 0;
 
       let recentDelta = null;
       if (deltaData && deltaData.length > 0) {
@@ -58,9 +58,9 @@ export default function Dashboard() {
       }
 
       setStats({
-        totalIndicators: ipv4Count + domainCount,
-        ipv4Count,
-        domainCount,
+        totalIndicators: totalIpv4 + totalDomain,
+        ipv4Count: totalIpv4,
+        domainCount: totalDomain,
         recentDelta,
       });
     } catch (error) {
