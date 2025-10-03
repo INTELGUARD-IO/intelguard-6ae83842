@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       'dynamic_raw_indicators',
       'GET',
       null,
-      '?select=indicator,kind&virustotal_checked=eq.false&order=last_validated.asc&limit=100'
+      '?select=indicator,kind&virustotal_checked=eq.false&order=last_validated.asc&limit=250'
     );
 
     if (!candidates || candidates.length === 0) {
