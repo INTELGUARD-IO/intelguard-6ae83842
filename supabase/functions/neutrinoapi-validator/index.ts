@@ -53,73 +53,108 @@ Deno.serve(async (req) => {
       throw new Error('NeutrinoAPI credentials not configured');
     }
 
-    // Step 1: Clean expired blocklist entries
-    console.log('Step 1: Cleaning expired NeutrinoAPI blocklist entries...');
-    await supabaseQuery(supabaseUrl, supabaseServiceKey, 'rpc/clean_expired_neutrinoapi_blocklist', 'POST');
-    console.log('✓ Expired entries cleaned\n');
-
-    // Step 2: Download IP Blocklist
-    console.log('Step 2: Downloading NeutrinoAPI IP Blocklist...');
-    const blocklistResponse = await fetch('https://neutrinoapi.net/ip-blocklist-download', {
+    console.log('Testing NeutrinoAPI credentials with IP Probe...');
+    const testResponse = await fetch('https://neutrinoapi.net/ip-probe', {
       method: 'POST',
       headers: {
         'User-ID': neutrinoUserId,
         'API-Key': neutrinoApiKey,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        format: 'csv',
-        cidr: 'false',
-        ip6: 'false',
-        category: 'all',
-        checksum: 'false',
-      }),
+      body: new URLSearchParams({ ip: '8.8.8.8' }),
     });
-
-    if (!blocklistResponse.ok) {
-      console.error(`Blocklist download failed: ${blocklistResponse.status}`);
-      throw new Error(`Failed to download blocklist: ${blocklistResponse.statusText}`);
+    
+    if (!testResponse.ok) {
+      const errorText = await testResponse.text();
+      console.error('Credential test failed:', testResponse.status, errorText);
+      throw new Error(`Invalid NeutrinoAPI credentials: ${testResponse.statusText}`);
     }
+    console.log('✓ Credentials validated\n');
 
-    const blocklistText = await blocklistResponse.text();
-    const blocklistLines = blocklistText.trim().split('\n').filter(line => line && !line.startsWith('#'));
-    console.log(`Downloaded ${blocklistLines.length} blocklist entries\n`);
+    // Step 1: Clean expired blocklist entries
+    console.log('Step 1: Cleaning expired NeutrinoAPI blocklist entries...');
+    await supabaseQuery(supabaseUrl, supabaseServiceKey, 'rpc/clean_expired_neutrinoapi_blocklist', 'POST');
+    console.log('✓ Expired entries cleaned\n');
 
-    // Parse and batch insert blocklist
-    const blocklistEntries: NeutrinoBlocklistEntry[] = [];
-    for (const line of blocklistLines) {
-      const parts = line.split(',');
-      if (parts.length >= 1) {
-        const ip = parts[0].trim();
-        const category = parts[1]?.trim() || 'unknown';
-        if (ip) {
-          blocklistEntries.push({ ip, category });
+    // Step 2: Download IP Blocklist (with fallback)
+    let blocklistEntries: NeutrinoBlocklistEntry[] = [];
+    try {
+      console.log('Step 2: Downloading NeutrinoAPI IP Blocklist...');
+      
+      // Try with GET method and query parameters
+      const blocklistUrl = new URL('https://neutrinoapi.net/ip-blocklist-download');
+      blocklistUrl.searchParams.append('user-id', neutrinoUserId);
+      blocklistUrl.searchParams.append('api-key', neutrinoApiKey);
+      blocklistUrl.searchParams.append('format', 'csv');
+      blocklistUrl.searchParams.append('cidr', 'false');
+      blocklistUrl.searchParams.append('ip6', 'false');
+      blocklistUrl.searchParams.append('category', 'all');
+      blocklistUrl.searchParams.append('checksum', 'false');
+
+      console.log('Trying GET method with query params...');
+      const blocklistResponse = await fetch(blocklistUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/csv, text/plain, */*',
+        },
+      });
+
+      console.log(`Response status: ${blocklistResponse.status}`);
+      console.log(`Response headers:`, Object.fromEntries(blocklistResponse.headers.entries()));
+
+      if (!blocklistResponse.ok) {
+        const responseText = await blocklistResponse.text();
+        console.error(`Blocklist download failed: ${blocklistResponse.status}`);
+        console.error(`Response body:`, responseText);
+        throw new Error(`Failed to download blocklist: ${blocklistResponse.statusText}`);
+      }
+
+      const blocklistText = await blocklistResponse.text();
+      console.log(`Raw response length: ${blocklistText.length} chars`);
+      console.log(`First 500 chars:`, blocklistText.substring(0, 500));
+      
+      const blocklistLines = blocklistText.trim().split('\n').filter(line => line && !line.startsWith('#'));
+      console.log(`Downloaded ${blocklistLines.length} blocklist entries\n`);
+
+      // Parse blocklist
+      for (const line of blocklistLines) {
+        const parts = line.split(',');
+        if (parts.length >= 1) {
+          const ip = parts[0].trim();
+          const category = parts[1]?.trim() || 'unknown';
+          if (ip) {
+            blocklistEntries.push({ ip, category });
+          }
         }
       }
-    }
 
-    // Batch insert blocklist (1000 per batch)
-    const batchSize = 1000;
-    for (let i = 0; i < blocklistEntries.length; i += batchSize) {
-      const batch = blocklistEntries.slice(i, i + batchSize);
-      const insertData = batch.map(entry => ({
-        indicator: entry.ip,
-        kind: 'ipv4',
-        category: entry.category,
-        added_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }));
+      // Batch insert blocklist (1000 per batch)
+      const batchSize = 1000;
+      for (let i = 0; i < blocklistEntries.length; i += batchSize) {
+        const batch = blocklistEntries.slice(i, i + batchSize);
+        const insertData = batch.map(entry => ({
+          indicator: entry.ip,
+          kind: 'ipv4',
+          category: entry.category,
+          added_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }));
 
-      await supabaseQuery(
-        supabaseUrl,
-        supabaseServiceKey,
-        'neutrinoapi_blocklist',
-        'POST',
-        insertData
-      );
-      console.log(`Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(blocklistEntries.length / batchSize)}`);
+        await supabaseQuery(
+          supabaseUrl,
+          supabaseServiceKey,
+          'neutrinoapi_blocklist',
+          'POST',
+          insertData
+        );
+        console.log(`Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(blocklistEntries.length / batchSize)}`);
+      }
+      console.log('✓ Blocklist updated\n');
+      
+    } catch (error) {
+      console.warn('Blocklist download failed, continuing with validation anyway:', error);
+      console.log('Will use Host Reputation and IP Probe only\n');
     }
-    console.log('✓ Blocklist updated\n');
 
     // Step 3: Fetch IPv4 indicators to validate
     console.log('Step 3: Fetching IPv4 indicators to validate...');
