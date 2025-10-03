@@ -52,7 +52,19 @@ export default function System() {
 
   const testEdgeFunction = async (functionName: string) => {
     setLoading({ ...loading, [functionName]: true });
+    
+    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator'];
+    const isValidator = validators.includes(functionName);
+    let interval: NodeJS.Timeout | null = null;
+    
     try {
+      // Start progress tracking for validators
+      if (isValidator) {
+        await trackValidatorProgress(functionName);
+        interval = setInterval(() => trackValidatorProgress(functionName), 15000);
+        setProgressInterval(interval);
+      }
+      
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: {},
       });
@@ -61,10 +73,23 @@ export default function System() {
 
       toast.success(`${functionName} executed successfully`);
       console.log(`${functionName} result:`, data);
+      
+      // Final progress update for validators
+      if (isValidator) {
+        await trackValidatorProgress(functionName);
+      }
     } catch (error: any) {
       console.error(`Error executing ${functionName}:`, error);
       toast.error(error.message || `Failed to execute ${functionName}`);
     } finally {
+      // Cleanup progress tracking
+      if (interval) {
+        clearInterval(interval);
+        setProgressInterval(null);
+      }
+      if (isValidator) {
+        setValidatorProgress(null);
+      }
       setLoading({ ...loading, [functionName]: false });
     }
   };
