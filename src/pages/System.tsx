@@ -327,6 +327,40 @@ export default function System() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  HoneyDB Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate IPv4 against HoneyDB bad hosts
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Checks IPs against HoneyDB bad hosts database and assigns threat scores.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('honeydb-validator')}
+                  disabled={loading['honeydb-validator']}
+                  className="w-full"
+                >
+                  {loading['honeydb-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run HoneyDB
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -432,6 +466,41 @@ export default function System() {
                   </div>
                   <div className="text-xs text-muted-foreground mt-4">
                     IPs with abuse confidence score ≥70% from AbuseIPDB, cached for 6 hours.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>HoneyDB Blacklist</CardTitle>
+                <CardDescription>
+                  Bad hosts from HoneyDB (24-hour TTL)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Bad Hosts</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { count } = await supabase
+                            .from('honeydb_blacklist')
+                            .select('*', { count: 'exact', head: true });
+                          toast.success(`Total: ${count || 0} hosts in blacklist`);
+                        } catch (error: any) {
+                          toast.error(error.message);
+                        }
+                      }}
+                    >
+                      Check Count
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-4">
+                    Malicious IPs detected by HoneyDB honeypots with threat scores, cached for 24 hours.
                   </div>
                 </div>
               </CardContent>
