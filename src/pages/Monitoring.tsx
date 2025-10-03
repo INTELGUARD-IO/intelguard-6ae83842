@@ -77,6 +77,7 @@ const Monitoring = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [validationJobs, setValidationJobs] = useState<ValidationJob[]>([]);
   const [jobsByStatus, setJobsByStatus] = useState<MetricData[]>([]);
+  const [ingestLogs, setIngestLogs] = useState<any[]>([]);
   const [systemHealth, setSystemHealth] = useState<SystemHealth>({
     status: 'healthy',
     issues: [],
@@ -167,6 +168,7 @@ const Monitoring = () => {
       loadValidatorStats(),
       loadLogs(),
       loadValidationJobs(),
+      loadIngestLogs(),
     ]);
     calculateSystemHealth();
     setLoading(false);
@@ -373,6 +375,24 @@ const Monitoring = () => {
       }
     } catch (error) {
       console.error('Error loading validation jobs:', error);
+    }
+  };
+
+  const loadIngestLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ingest_logs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      if (data) {
+        setIngestLogs(data);
+      }
+    } catch (error) {
+      console.error('Error loading ingest logs:', error);
     }
   };
 
@@ -686,6 +706,7 @@ const Monitoring = () => {
           <TabsTrigger value="queue">Validation Queue</TabsTrigger>
           <TabsTrigger value="validators">Validators</TabsTrigger>
           <TabsTrigger value="sources">Ingest Sources</TabsTrigger>
+          <TabsTrigger value="ingest-logs">Ingest Logs</TabsTrigger>
           <TabsTrigger value="cron">CRON Jobs</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
@@ -1055,6 +1076,81 @@ const Monitoring = () => {
                   </TableRow>
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ingest-logs" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ingest Logs (Ultimi 100)</CardTitle>
+              <CardDescription>Storia dettagliata delle esecuzioni di ingest per ogni source</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Started</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Indicators</TableHead>
+                      <TableHead>Error</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ingestLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          Nessun log di ingest disponibile. I log verranno generati alla prossima esecuzione.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      ingestLogs.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="font-medium">{log.source_name}</TableCell>
+                          <TableCell className="text-xs">
+                            {new Date(log.started_at).toLocaleString('it-IT')}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {log.status === 'success' ? (
+                              <Badge className="bg-green-500">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Successo
+                              </Badge>
+                            ) : log.status === 'error' ? (
+                              <Badge variant="destructive">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Errore
+                              </Badge>
+                            ) : log.status === 'timeout' ? (
+                              <Badge className="bg-yellow-500">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Timeout
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Running
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {log.indicators_fetched?.toLocaleString() || '0'}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[300px] truncate text-destructive">
+                            {log.error_message || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>

@@ -16,7 +16,12 @@ interface IngestSource {
   kind: 'ipv4' | 'domain';
   name: string;
   enabled: boolean;
+  priority: number;
+  last_attempt: string | null;
 }
+
+// Process max 5 sources per invocation to avoid timeout
+const MAX_SOURCES_PER_RUN = 5;
 
 // --- Helpers di validazione ---
 const isIPv4 = (s: string) =>
@@ -130,19 +135,23 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
-    console.log('[ingest] Starting optimized ingestion run…');
+    console.log('[ingest] Starting optimized ingestion run with rotation…');
 
-    const { data: sources, error: sourcesError } = await supabase
+    // Fetch enabled sources sorted by priority (desc) and last_attempt (asc, nulls first)
+    // This ensures high-priority sources and sources not recently attempted are processed first
+    const { data: allSources, error: sourcesError } = await supabase
       .from('ingest_sources')
       .select('*')
-      .eq('enabled', true);
+      .eq('enabled', true)
+      .order('priority', { ascending: false })
+      .order('last_attempt', { ascending: true, nullsFirst: true });
 
     if (sourcesError) {
       console.error('[ingest] Failed to fetch sources:', sourcesError);
       throw sourcesError;
     }
 
-    if (!sources || sources.length === 0) {
+    if (!allSources || allSources.length === 0) {
       console.log('[ingest] No enabled sources found');
       return new Response(JSON.stringify({ success: true, count: 0, note: 'no enabled sources' }), {
         status: 200,
@@ -150,7 +159,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[ingest] Processing ${sources.length} sources with optimized batching`);
+    // Process only MAX_SOURCES_PER_RUN sources per invocation to avoid timeout
+    const sources = allSources.slice(0, MAX_SOURCES_PER_RUN);
+    console.log(`[ingest] Processing ${sources.length} of ${allSources.length} enabled sources (batch rotation)`);
 
     const nowIso = new Date().toISOString();
     const BATCH_SIZE = 5000; // Increased from 1000
@@ -164,13 +175,26 @@ Deno.serve(async (req) => {
       let batchBuffer: Array<{ indicator: string; kind: 'ipv4' | 'domain'; source: string }> = [];
       const seen = new Set<string>();
       
+      // Create log entry
+      const { data: logEntry } = await supabase
+        .from('ingest_logs')
+        .insert({
+          source_id: source.id,
+          source_name: source.name,
+          status: 'running',
+        })
+        .select()
+        .single();
+      
+      const logId = logEntry?.id;
+      
       try {
-        console.log(`[ingest] Starting ${source.name} (${source.kind})`);
+        console.log(`[ingest] Starting ${source.name} (${source.kind}) [priority: ${source.priority}]`);
         
-        // Mark run start
+        // Mark attempt start
         await supabase
           .from('ingest_sources')
-          .update({ last_run: nowIso })
+          .update({ last_run: nowIso, last_attempt: nowIso })
           .eq('id', source.id);
         
         for await (const line of fetchTextStream(source.url, 180000)) {
@@ -269,31 +293,74 @@ Deno.serve(async (req) => {
         const rate = (sourceCount / (duration / 1000)).toFixed(0);
         console.log(`[ingest] ✓ ${source.name}: ${sourceCount} indicators in ${duration}ms (${rate}/sec)`);
         
+        // Update source metadata
         await supabase
           .from('ingest_sources')
           .update({
             last_success: new Date().toISOString(),
             last_run: new Date().toISOString(),
+            last_attempt: new Date().toISOString(),
             indicators_count: sourceCount,
             last_error: null,
           })
           .eq('id', source.id);
+        
+        // Update log entry
+        if (logId) {
+          await supabase
+            .from('ingest_logs')
+            .update({
+              status: 'success',
+              completed_at: new Date().toISOString(),
+              indicators_fetched: sourceCount,
+              duration_ms: duration,
+            })
+            .eq('id', logId);
+        }
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
+        const duration = Date.now() - startTime;
+        const isTimeout = errorMsg.includes('aborted') || errorMsg.includes('timeout');
+        
         console.error(`[ingest] ${source.name} failed:`, errorMsg);
         
+        // Update source metadata
         await supabase
           .from('ingest_sources')
           .update({
             last_run: new Date().toISOString(),
+            last_attempt: new Date().toISOString(),
             last_error: errorMsg,
           })
           .eq('id', source.id);
+        
+        // Update log entry
+        if (logId) {
+          await supabase
+            .from('ingest_logs')
+            .update({
+              status: isTimeout ? 'timeout' : 'error',
+              completed_at: new Date().toISOString(),
+              error_message: errorMsg,
+              indicators_fetched: sourceCount,
+              duration_ms: duration,
+            })
+            .eq('id', logId);
+        }
       }
     }
 
-    console.log('[ingest] Completed. Total:', totalProcessed);
-    return new Response(JSON.stringify({ success: true, count: totalProcessed }), {
+    const processed = sources.length;
+    const remaining = allSources.length - processed;
+    console.log(`[ingest] Completed batch: ${totalProcessed} indicators from ${processed} sources. Remaining: ${remaining}`);
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      count: totalProcessed,
+      sources_processed: processed,
+      sources_remaining: remaining,
+      total_enabled_sources: allSources.length
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

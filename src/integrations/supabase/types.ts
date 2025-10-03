@@ -289,6 +289,50 @@ export type Database = {
         }
         Relationships: []
       }
+      ingest_logs: {
+        Row: {
+          completed_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          id: number
+          indicators_fetched: number | null
+          source_id: string
+          source_name: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: never
+          indicators_fetched?: number | null
+          source_id: string
+          source_name: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          completed_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: never
+          indicators_fetched?: number | null
+          source_id?: string
+          source_name?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_source"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "ingest_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingest_sources: {
         Row: {
           created_at: string
@@ -297,10 +341,12 @@ export type Database = {
           id: string
           indicators_count: number | null
           kind: string
+          last_attempt: string | null
           last_error: string | null
           last_run: string | null
           last_success: string | null
           name: string
+          priority: number | null
           updated_at: string
           url: string
         }
@@ -311,10 +357,12 @@ export type Database = {
           id?: string
           indicators_count?: number | null
           kind: string
+          last_attempt?: string | null
           last_error?: string | null
           last_run?: string | null
           last_success?: string | null
           name: string
+          priority?: number | null
           updated_at?: string
           url: string
         }
@@ -325,10 +373,12 @@ export type Database = {
           id?: string
           indicators_count?: number | null
           kind?: string
+          last_attempt?: string | null
           last_error?: string | null
           last_run?: string | null
           last_success?: string | null
           name?: string
+          priority?: number | null
           updated_at?: string
           url?: string
         }
