@@ -20,6 +20,13 @@ import {
 export default function System() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [logs, setLogs] = useState<any[]>([]);
+  const [runningAllValidators, setRunningAllValidators] = useState(false);
+  const [validatorProgress, setValidatorProgress] = useState<{
+    validator: string;
+    processed: number;
+    total: number;
+  } | null>(null);
+  const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null);
   const { isSuperAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
@@ -29,6 +36,15 @@ export default function System() {
       toast.error('Access denied: Super admin only');
     }
   }, [isSuperAdmin, roleLoading, navigate]);
+
+  // Cleanup progress interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [progressInterval]);
 
   if (roleLoading || !isSuperAdmin) {
     return null;
@@ -105,6 +121,82 @@ export default function System() {
     }
   };
 
+  const trackValidatorProgress = async (validatorName: string) => {
+    try {
+      // Get total indicators
+      const { count: totalCount } = await supabase
+        .from('dynamic_raw_indicators')
+        .select('*', { count: 'exact', head: true });
+
+      // Get processed count based on validator
+      let processedCount = 0;
+      if (validatorName === 'abuse-ch-validator') {
+        const { count } = await supabase
+          .from('dynamic_raw_indicators')
+          .select('*', { count: 'exact', head: true })
+          .eq('abuse_ch_checked', true);
+        processedCount = count || 0;
+      } else if (validatorName === 'honeydb-validator') {
+        const { count } = await supabase
+          .from('dynamic_raw_indicators')
+          .select('*', { count: 'exact', head: true })
+          .eq('honeydb_checked', true);
+        processedCount = count || 0;
+      } else if (validatorName === 'abuseipdb-validator') {
+        const { count } = await supabase
+          .from('dynamic_raw_indicators')
+          .select('*', { count: 'exact', head: true })
+          .eq('abuseipdb_checked', true);
+        processedCount = count || 0;
+      }
+
+      setValidatorProgress({
+        validator: validatorName,
+        processed: processedCount,
+        total: totalCount || 0,
+      });
+    } catch (error) {
+      console.error('Error tracking progress:', error);
+    }
+  };
+
+  const runAllValidators = async () => {
+    setRunningAllValidators(true);
+    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator'];
+
+    for (const validator of validators) {
+      try {
+        setLoading({ ...loading, [validator]: true });
+        
+        // Start progress tracking
+        await trackValidatorProgress(validator);
+        const interval = setInterval(() => trackValidatorProgress(validator), 15000);
+        setProgressInterval(interval);
+
+        // Run validator
+        const { error } = await supabase.functions.invoke(validator, { body: {} });
+        
+        if (error) throw error;
+        
+        // Clear interval and update one last time
+        clearInterval(interval);
+        await trackValidatorProgress(validator);
+        
+        toast.success(`${validator} completed successfully`);
+      } catch (error: any) {
+        console.error(`Error running ${validator}:`, error);
+        toast.error(error.message || `Failed to run ${validator}`);
+      } finally {
+        setLoading({ ...loading, [validator]: false });
+        if (progressInterval) clearInterval(progressInterval);
+      }
+    }
+
+    setRunningAllValidators(false);
+    setValidatorProgress(null);
+    toast.success('All validators completed!');
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,6 +205,43 @@ export default function System() {
           Test edge functions and monitor cron jobs
         </p>
       </div>
+
+      {/* Run All Validators Button */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">Run All Validators</h3>
+              <p className="text-sm text-muted-foreground">
+                Execute Abuse.ch, HoneyDB, and AbuseIPDB validators sequentially
+              </p>
+              {validatorProgress && (
+                <div className="text-sm font-medium text-primary mt-2">
+                  Running {validatorProgress.validator}: {validatorProgress.processed} / {validatorProgress.total}
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={runAllValidators}
+              disabled={runningAllValidators || Object.values(loading).some(v => v)}
+              size="lg"
+              className="min-w-[200px]"
+            >
+              {runningAllValidators ? (
+                <>
+                  <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                  Running All...
+                </>
+              ) : (
+                <>
+                  <Play className="h-5 w-5 mr-2" />
+                  Run All Validators
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="functions" className="space-y-4">
         <TabsList>
@@ -242,13 +371,18 @@ export default function System() {
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('abuse-ch-validator')}
-                  disabled={loading['abuse-ch-validator']}
+                  disabled={loading['abuse-ch-validator'] || runningAllValidators}
                   className="w-full"
                 >
                   {loading['abuse-ch-validator'] ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                       Running...
+                      {validatorProgress?.validator === 'abuse-ch-validator' && (
+                        <span className="ml-2 text-xs">
+                          ({validatorProgress.processed} / {validatorProgress.total})
+                        </span>
+                      )}
                     </>
                   ) : (
                     <>
@@ -276,13 +410,18 @@ export default function System() {
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('abuseipdb-validator')}
-                  disabled={loading['abuseipdb-validator']}
+                  disabled={loading['abuseipdb-validator'] || runningAllValidators}
                   className="w-full"
                 >
                   {loading['abuseipdb-validator'] ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                       Running...
+                      {validatorProgress?.validator === 'abuseipdb-validator' && (
+                        <span className="ml-2 text-xs">
+                          ({validatorProgress.processed} / {validatorProgress.total})
+                        </span>
+                      )}
                     </>
                   ) : (
                     <>
@@ -344,13 +483,18 @@ export default function System() {
                 </div>
                 <Button
                   onClick={() => testEdgeFunction('honeydb-validator')}
-                  disabled={loading['honeydb-validator']}
+                  disabled={loading['honeydb-validator'] || runningAllValidators}
                   className="w-full"
                 >
                   {loading['honeydb-validator'] ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                       Running...
+                      {validatorProgress?.validator === 'honeydb-validator' && (
+                        <span className="ml-2 text-xs">
+                          ({validatorProgress.processed} / {validatorProgress.total})
+                        </span>
+                      )}
                     </>
                   ) : (
                     <>
