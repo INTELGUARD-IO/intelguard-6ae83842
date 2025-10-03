@@ -193,15 +193,23 @@ export default function IngestSources() {
       formData.append('kind', uploadConfig.kind);
       formData.append('sourceName', uploadConfig.sourceName);
 
-      const response = await supabase.functions.invoke('manual-ingest', {
-        body: formData,
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manual-ingest`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        }
+      );
 
-      if (response.error) {
-        throw response.error;
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${errorText}`);
       }
 
-      const result = response.data;
+      const result = await response.json();
       
       if (result.success) {
         toast.success(
