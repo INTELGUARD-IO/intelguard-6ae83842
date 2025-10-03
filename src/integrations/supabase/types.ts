@@ -128,6 +128,13 @@ export type Database = {
           indicator: string
           kind: string
           last_validated: string
+          neutrinoapi_checked: boolean
+          neutrinoapi_host_reputation_score: number | null
+          neutrinoapi_in_blocklist: boolean | null
+          neutrinoapi_is_hosting: boolean | null
+          neutrinoapi_is_proxy: boolean | null
+          neutrinoapi_is_vpn: boolean | null
+          neutrinoapi_metadata: Json | null
           source_count: number
           sources: string[]
           urlscan_checked: boolean
@@ -149,6 +156,13 @@ export type Database = {
           indicator: string
           kind: string
           last_validated?: string
+          neutrinoapi_checked?: boolean
+          neutrinoapi_host_reputation_score?: number | null
+          neutrinoapi_in_blocklist?: boolean | null
+          neutrinoapi_is_hosting?: boolean | null
+          neutrinoapi_is_proxy?: boolean | null
+          neutrinoapi_is_vpn?: boolean | null
+          neutrinoapi_metadata?: Json | null
           source_count?: number
           sources: string[]
           urlscan_checked?: boolean
@@ -170,6 +184,13 @@ export type Database = {
           indicator?: string
           kind?: string
           last_validated?: string
+          neutrinoapi_checked?: boolean
+          neutrinoapi_host_reputation_score?: number | null
+          neutrinoapi_in_blocklist?: boolean | null
+          neutrinoapi_is_hosting?: boolean | null
+          neutrinoapi_is_proxy?: boolean | null
+          neutrinoapi_is_vpn?: boolean | null
+          neutrinoapi_metadata?: Json | null
           source_count?: number
           sources?: string[]
           urlscan_checked?: boolean
@@ -414,6 +435,30 @@ export type Database = {
           priority?: number | null
           updated_at?: string
           url?: string
+        }
+        Relationships: []
+      }
+      neutrinoapi_blocklist: {
+        Row: {
+          added_at: string
+          category: string | null
+          expires_at: string
+          indicator: string
+          kind: string
+        }
+        Insert: {
+          added_at?: string
+          category?: string | null
+          expires_at?: string
+          indicator: string
+          kind?: string
+        }
+        Update: {
+          added_at?: string
+          category?: string | null
+          expires_at?: string
+          indicator?: string
+          kind?: string
         }
         Relationships: []
       }
@@ -717,6 +762,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_honeydb_blacklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_neutrinoapi_blocklist: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
