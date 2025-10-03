@@ -266,7 +266,7 @@ export default function System() {
 
   const runAllValidators = async () => {
     setRunningAllValidators(true);
-    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator'];
+    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator', 'neutrinoapi-validator'];
 
     for (const validator of validators) {
       try {
@@ -605,6 +605,45 @@ export default function System() {
                     <>
                       <Play className="h-4 w-4 mr-2" />
                       Run HoneyDB
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  NeutrinoAPI Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate IPs via NeutrinoAPI (Blocklist + 150 DNSBLs + IP Probe)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Checks IPs against NeutrinoAPI blocklist, 150+ DNSBLs, and performs deep IP analysis (VPN/Proxy/Hosting detection, ASN, geo).
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('neutrinoapi-validator')}
+                  disabled={loading['neutrinoapi-validator'] || runningAllValidators}
+                  className="w-full"
+                >
+                  {loading['neutrinoapi-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                      {validatorProgress?.validator === 'neutrinoapi-validator' && (
+                        <span className="ml-2 text-xs">
+                          ({validatorProgress.processed} / {validatorProgress.total})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run NeutrinoAPI
                     </>
                   )}
                 </Button>
