@@ -266,7 +266,7 @@ export default function System() {
 
   const runAllValidators = async () => {
     setRunningAllValidators(true);
-    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator', 'neutrinoapi-validator'];
+    const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator', 'neutrinoapi-validator', 'virustotal-validator'];
 
     for (const validator of validators) {
       try {
@@ -644,6 +644,45 @@ export default function System() {
                     <>
                       <Play className="h-4 w-4 mr-2" />
                       Run NeutrinoAPI
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  VirusTotal Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate indicators using VirusTotal API
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Queries VirusTotal for IPv4 and domain reputation data. Rate limited to 4 lookups/min, 500/day.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('virustotal-validator')}
+                  disabled={loading['virustotal-validator']}
+                  className="w-full"
+                >
+                  {loading['virustotal-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Validating...
+                      {validatorProgress && validatorProgress.validator === 'virustotal-validator' && (
+                        <span className="ml-2 text-xs">
+                          {validatorProgress.processed} / {validatorProgress.total}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run VirusTotal
                     </>
                   )}
                 </Button>

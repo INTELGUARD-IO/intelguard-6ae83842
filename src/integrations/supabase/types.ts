@@ -140,6 +140,9 @@ export type Database = {
           urlscan_checked: boolean
           urlscan_malicious: boolean | null
           urlscan_score: number | null
+          virustotal_checked: boolean
+          virustotal_malicious: boolean | null
+          virustotal_score: number | null
         }
         Insert: {
           abuse_ch_checked?: boolean
@@ -168,6 +171,9 @@ export type Database = {
           urlscan_checked?: boolean
           urlscan_malicious?: boolean | null
           urlscan_score?: number | null
+          virustotal_checked?: boolean
+          virustotal_malicious?: boolean | null
+          virustotal_score?: number | null
         }
         Update: {
           abuse_ch_checked?: boolean
@@ -196,6 +202,9 @@ export type Database = {
           urlscan_checked?: boolean
           urlscan_malicious?: boolean | null
           urlscan_score?: number | null
+          virustotal_checked?: boolean
+          virustotal_malicious?: boolean | null
+          virustotal_score?: number | null
         }
         Relationships: []
       }
@@ -744,6 +753,45 @@ export type Database = {
         }
         Relationships: []
       }
+      virustotal_cache: {
+        Row: {
+          checked_at: string
+          expires_at: string
+          harmless_count: number | null
+          indicator: string
+          kind: string
+          last_analysis_stats: Json | null
+          malicious_count: number | null
+          reputation: number | null
+          suspicious_count: number | null
+          undetected_count: number | null
+        }
+        Insert: {
+          checked_at?: string
+          expires_at?: string
+          harmless_count?: number | null
+          indicator: string
+          kind: string
+          last_analysis_stats?: Json | null
+          malicious_count?: number | null
+          reputation?: number | null
+          suspicious_count?: number | null
+          undetected_count?: number | null
+        }
+        Update: {
+          checked_at?: string
+          expires_at?: string
+          harmless_count?: number | null
+          indicator?: string
+          kind?: string
+          last_analysis_stats?: Json | null
+          malicious_count?: number | null
+          reputation?: number | null
+          suspicious_count?: number | null
+          undetected_count?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -766,6 +814,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_neutrinoapi_blocklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_virustotal_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
