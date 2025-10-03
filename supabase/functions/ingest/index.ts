@@ -264,24 +264,14 @@ Deno.serve(async (req) => {
               last_seen: upsertTime,
             }));
             
+            // Upsert handles both INSERT and UPDATE of last_seen automatically
             const { error: insErr } = await supabase
               .from('raw_indicators')
-              .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
+              .upsert(toInsert, { onConflict: 'indicator,source' });
             
             if (insErr) {
-              console.error('[ingest] Batch insert error:', insErr);
+              console.error('[ingest] Batch upsert error:', insErr);
               throw insErr;
-            }
-            
-            const indicators = batchBuffer.map(r => r.indicator);
-            const { error: updErr } = await supabase
-              .from('raw_indicators')
-              .update({ last_seen: upsertTime })
-              .eq('source', source.url)
-              .in('indicator', indicators);
-            
-            if (updErr) {
-              console.error('[ingest] Batch update error:', updErr);
             }
             
             totalProcessed += batchBuffer.length;
@@ -310,24 +300,14 @@ Deno.serve(async (req) => {
             last_seen: upsertTime,
           }));
           
+          // Upsert handles both INSERT and UPDATE of last_seen automatically
           const { error: insErr } = await supabase
             .from('raw_indicators')
-            .upsert(toInsert, { onConflict: 'indicator,source', ignoreDuplicates: true });
+            .upsert(toInsert, { onConflict: 'indicator,source' });
           
           if (insErr) {
-            console.error('[ingest] Final batch insert error:', insErr);
+            console.error('[ingest] Final batch upsert error:', insErr);
             throw insErr;
-          }
-          
-          const indicators = batchBuffer.map(r => r.indicator);
-          const { error: updErr } = await supabase
-            .from('raw_indicators')
-            .update({ last_seen: upsertTime })
-            .eq('source', source.url)
-            .in('indicator', indicators);
-          
-          if (updErr) {
-            console.error('[ingest] Final batch update error:', updErr);
           }
           
           totalProcessed += batchBuffer.length;

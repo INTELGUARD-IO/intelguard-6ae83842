@@ -71,3 +71,33 @@ export const supabaseRPC = async (
   
   return null;
 };
+
+// Upsert helper that properly handles batch inserts with ON CONFLICT
+export const supabaseUpsert = async (
+  url: string,
+  serviceKey: string,
+  table: string,
+  data: any[],
+  conflictColumns?: string[]
+) => {
+  const endpoint = `${url}/rest/v1/${table}`;
+  const headers: Record<string, string> = {
+    'apikey': serviceKey,
+    'Authorization': `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'resolution=merge-duplicates,return=minimal'
+  };
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`Supabase UPSERT error (${response.status}): ${errorData}`);
+  }
+
+  return response.status;
+};
