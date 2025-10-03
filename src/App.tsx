@@ -12,6 +12,7 @@ import FeedTokens from "./pages/FeedTokens";
 import System from "./pages/System";
 import IngestSources from "./pages/IngestSources";
 import Monitoring from "./pages/Monitoring";
+import NetworkStatus from "./pages/NetworkStatus";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/system" element={<System />} />
             <Route path="/ingest-sources" element={<IngestSources />} />
             <Route path="/monitoring" element={<Monitoring />} />
+            <Route path="/network-status" element={<NetworkStatus />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

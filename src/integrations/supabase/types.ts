@@ -447,6 +447,69 @@ export type Database = {
         }
         Relationships: []
       }
+      network_activity_log: {
+        Row: {
+          bytes_transferred: number | null
+          call_type: string
+          completed_at: string | null
+          edge_function_name: string | null
+          error_message: string | null
+          id: string
+          items_processed: number | null
+          items_total: number | null
+          metadata: Json | null
+          method: string
+          request_headers: Json | null
+          response_time_ms: number | null
+          started_at: string
+          status: string
+          status_code: number | null
+          target_name: string
+          target_url: string
+          user_id: string | null
+        }
+        Insert: {
+          bytes_transferred?: number | null
+          call_type: string
+          completed_at?: string | null
+          edge_function_name?: string | null
+          error_message?: string | null
+          id?: string
+          items_processed?: number | null
+          items_total?: number | null
+          metadata?: Json | null
+          method?: string
+          request_headers?: Json | null
+          response_time_ms?: number | null
+          started_at?: string
+          status?: string
+          status_code?: number | null
+          target_name: string
+          target_url: string
+          user_id?: string | null
+        }
+        Update: {
+          bytes_transferred?: number | null
+          call_type?: string
+          completed_at?: string | null
+          edge_function_name?: string | null
+          error_message?: string | null
+          id?: string
+          items_processed?: number | null
+          items_total?: number | null
+          metadata?: Json | null
+          method?: string
+          request_headers?: Json | null
+          response_time_ms?: number | null
+          started_at?: string
+          status?: string
+          status_code?: number | null
+          target_name?: string
+          target_url?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       neutrinoapi_blocklist: {
         Row: {
           added_at: string

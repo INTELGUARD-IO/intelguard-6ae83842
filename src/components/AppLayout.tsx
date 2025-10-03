@@ -65,6 +65,9 @@ export function AppLayout() {
                 <Link to="/monitoring" className="text-sm font-medium hover:text-primary transition-colors">
                   Monitoring
                 </Link>
+                <Link to="/network-status" className="text-sm font-medium hover:text-primary transition-colors">
+                  Network Status
+                </Link>
               </>
             )}
           </nav>
