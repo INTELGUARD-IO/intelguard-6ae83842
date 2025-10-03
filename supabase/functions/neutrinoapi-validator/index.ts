@@ -54,19 +54,25 @@ Deno.serve(async (req) => {
     }
 
     console.log('Testing NeutrinoAPI credentials with IP Probe...');
+    console.log('Using User-ID:', neutrinoUserId);
     const testResponse = await fetch('https://neutrinoapi.net/ip-probe', {
       method: 'POST',
       headers: {
-        'user-id': neutrinoUserId,
-        'api-key': neutrinoApiKey,
+        'User-ID': neutrinoUserId,
+        'API-Key': neutrinoApiKey,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({ ip: '8.8.8.8' }),
     });
+
+    const testData = await testResponse.json();
+    console.log('Credential test response:', testResponse.status, JSON.stringify(testData));
     
     if (!testResponse.ok) {
-      const errorText = await testResponse.text();
-      console.error('Credential test failed:', testResponse.status, errorText);
+      console.error('Credential test failed:', testResponse.status, JSON.stringify(testData));
+      if (testData['api-error']) {
+        throw new Error(`NeutrinoAPI Error ${testData['api-error']}: ${testData['api-error-msg']}`);
+      }
       throw new Error(`Invalid NeutrinoAPI credentials: ${testResponse.statusText}`);
     }
     console.log('✓ Credentials validated\n');
@@ -205,8 +211,8 @@ Deno.serve(async (req) => {
         const hostRepResponse = await fetch('https://neutrinoapi.net/host-reputation', {
           method: 'POST',
           headers: {
-            'user-id': neutrinoUserId,
-            'api-key': neutrinoApiKey,
+            'User-ID': neutrinoUserId,
+            'API-Key': neutrinoApiKey,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
@@ -229,8 +235,8 @@ Deno.serve(async (req) => {
         const ipProbeResponse = await fetch('https://neutrinoapi.net/ip-probe', {
           method: 'POST',
           headers: {
-            'user-id': neutrinoUserId,
-            'api-key': neutrinoApiKey,
+            'User-ID': neutrinoUserId,
+            'API-Key': neutrinoApiKey,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
