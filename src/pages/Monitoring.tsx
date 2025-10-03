@@ -78,6 +78,8 @@ const Monitoring = () => {
   const [validationJobs, setValidationJobs] = useState<ValidationJob[]>([]);
   const [jobsByStatus, setJobsByStatus] = useState<MetricData[]>([]);
   const [ingestLogs, setIngestLogs] = useState<any[]>([]);
+  const [dailyDeltas, setDailyDeltas] = useState<any[]>([]);
+  const [isAutoRefreshActive, setIsAutoRefreshActive] = useState(false);
   const [systemHealth, setSystemHealth] = useState<SystemHealth>({
     status: 'healthy',
     issues: [],
@@ -169,6 +171,7 @@ const Monitoring = () => {
       loadLogs(),
       loadValidationJobs(),
       loadIngestLogs(),
+      loadDailyDeltas(),
     ]);
     calculateSystemHealth();
     setLoading(false);
@@ -396,6 +399,24 @@ const Monitoring = () => {
     }
   };
 
+  const loadDailyDeltas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('daily_deltas')
+        .select('*')
+        .order('run_date', { ascending: false })
+        .limit(7);
+
+      if (error) throw error;
+
+      if (data) {
+        setDailyDeltas(data);
+      }
+    } catch (error) {
+      console.error('Error loading daily deltas:', error);
+    }
+  };
+
   const calculateSystemHealth = async () => {
     try {
       const { count: pendingCount } = await supabase
@@ -536,15 +557,52 @@ const Monitoring = () => {
     }
   };
 
-  // Auto-refresh every 10 seconds
+  // Intelligent auto-refresh with Page Visibility API
   useEffect(() => {
-    if (userRole === 'super_admin') {
-      const interval = setInterval(() => {
+    if (userRole !== 'super_admin') return;
+
+    let interval: NodeJS.Timeout | null = null;
+
+    const startAutoRefresh = () => {
+      if (interval) return; // Already running
+      setIsAutoRefreshActive(true);
+      interval = setInterval(() => {
         loadAllData();
       }, 10000);
+    };
 
-      return () => clearInterval(interval);
+    const stopAutoRefresh = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+      setIsAutoRefreshActive(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden (tab switch, minimize) - activate auto-refresh
+        startAutoRefresh();
+      } else {
+        // Page is visible - pause auto-refresh
+        stopAutoRefresh();
+      }
+    };
+
+    // Set initial state
+    if (document.hidden) {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
     }
+
+    // Listen to visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopAutoRefresh();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [userRole]);
 
   if (loading || !userRole) {
@@ -571,7 +629,12 @@ const Monitoring = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-primary">Sistema di Monitoring</h1>
-          <p className="text-muted-foreground">Dashboard di monitoraggio in tempo reale</p>
+          <p className="text-muted-foreground">
+            Dashboard di monitoraggio in tempo reale
+            <span className="ml-3 text-xs">
+              Auto-refresh: {isAutoRefreshActive ? '🟢 Attivo (in background)' : '🔴 Pausa (pagina visibile)'}
+            </span>
+          </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={exportMetrics} variant="outline" size="sm">
@@ -650,6 +713,99 @@ const Monitoring = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Daily Delta Section */}
+      {dailyDeltas.length > 0 && (
+        <Card className="border-blue-500">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="text-blue-500" />
+              <CardTitle>Daily Delta - Ultime 24h</CardTitle>
+            </div>
+            <CardDescription>Variazioni indicatori nelle ultime 24 ore</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+              {/* IPv4 Delta */}
+              {dailyDeltas.filter(d => d.kind === 'ipv4').slice(0, 1).map((delta) => (
+                <div key={delta.id} className="space-y-2">
+                  <h3 className="font-semibold text-lg">IPv4</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Aggiunti</p>
+                      <p className="text-2xl font-bold text-green-600">+{delta.added.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Rimossi</p>
+                      <p className="text-2xl font-bold text-red-600">-{delta.removed.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Netti</p>
+                      <p className={`text-2xl font-bold ${(delta.added - delta.removed) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(delta.added - delta.removed) >= 0 ? '+' : ''}{(delta.added - delta.removed).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Domain Delta */}
+              {dailyDeltas.filter(d => d.kind === 'domain').slice(0, 1).map((delta) => (
+                <div key={delta.id} className="space-y-2">
+                  <h3 className="font-semibold text-lg">Domain</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Aggiunti</p>
+                      <p className="text-2xl font-bold text-green-600">+{delta.added.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Rimossi</p>
+                      <p className="text-2xl font-bold text-red-600">-{delta.removed.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Netti</p>
+                      <p className={`text-2xl font-bold ${(delta.added - delta.removed) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(delta.added - delta.removed) >= 0 ? '+' : ''}{(delta.added - delta.removed).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 7-Day Chart */}
+            <div className="mt-4">
+              <h3 className="font-semibold text-sm mb-3">Trend ultimi 7 giorni</h3>
+              <ChartContainer config={barChartConfig} className="h-[200px]">
+                <BarChart
+                  data={dailyDeltas.reverse().map(d => ({
+                    date: new Date(d.run_date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }),
+                    IPv4: d.kind === 'ipv4' ? (d.added - d.removed) : 0,
+                    Domain: d.kind === 'domain' ? (d.added - d.removed) : 0,
+                  })).reduce((acc: any[], curr) => {
+                    const existing = acc.find(item => item.date === curr.date);
+                    if (existing) {
+                      existing.IPv4 += curr.IPv4;
+                      existing.Domain += curr.Domain;
+                    } else {
+                      acc.push(curr);
+                    }
+                    return acc;
+                  }, [])}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  <Bar dataKey="IPv4" fill="#06B6D4" />
+                  <Bar dataKey="Domain" fill="#8B5CF6" />
+                </BarChart>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pipeline Status Overview */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
