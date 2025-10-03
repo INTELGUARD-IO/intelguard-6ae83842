@@ -121,6 +121,9 @@ export type Database = {
           abuseipdb_score: number | null
           confidence: number
           first_validated: string
+          honeydb_checked: boolean
+          honeydb_in_blacklist: boolean | null
+          honeydb_threat_score: number | null
           id: number
           indicator: string
           kind: string
@@ -139,6 +142,9 @@ export type Database = {
           abuseipdb_score?: number | null
           confidence: number
           first_validated?: string
+          honeydb_checked?: boolean
+          honeydb_in_blacklist?: boolean | null
+          honeydb_threat_score?: number | null
           id?: number
           indicator: string
           kind: string
@@ -157,6 +163,9 @@ export type Database = {
           abuseipdb_score?: number | null
           confidence?: number
           first_validated?: string
+          honeydb_checked?: boolean
+          honeydb_in_blacklist?: boolean | null
+          honeydb_threat_score?: number | null
           id?: number
           indicator?: string
           kind?: string
@@ -261,6 +270,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      honeydb_blacklist: {
+        Row: {
+          added_at: string
+          expires_at: string
+          indicator: string
+          last_seen: string
+          threat_score: number | null
+        }
+        Insert: {
+          added_at?: string
+          expires_at?: string
+          indicator: string
+          last_seen?: string
+          threat_score?: number | null
+        }
+        Update: {
+          added_at?: string
+          expires_at?: string
+          indicator?: string
+          last_seen?: string
+          threat_score?: number | null
+        }
+        Relationships: []
       }
       indicator_snapshots: {
         Row: {
@@ -644,6 +677,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_abuseipdb_blacklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_honeydb_blacklist: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

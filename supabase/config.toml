@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.urlscan-validator]
 verify_jwt = false
+
+[functions.honeydb-validator]
+verify_jwt = false
