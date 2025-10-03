@@ -2,6 +2,7 @@
 // Ingest: fetch sources (IPv4 + Domains), normalize, insert-if-new, bump last_seen
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
 
 // --- CORS ---
 const corsHeaders = {
@@ -220,6 +221,17 @@ Deno.serve(async (req) => {
       
       const logId = logEntry?.id;
       
+      // Log network activity
+      const networkLogId = await logNetworkCall(supabaseUrl, serviceKey, {
+        call_type: 'ingest',
+        target_url: source.url,
+        target_name: source.name,
+        method: 'GET',
+        edge_function_name: 'ingest',
+        items_total: undefined,
+        metadata: { kind: source.kind, priority: source.priority }
+      });
+      
       try {
         console.log(`[ingest] Starting ${source.name} (${source.kind}) [priority: ${source.priority}]`);
         
@@ -325,6 +337,16 @@ Deno.serve(async (req) => {
         const rate = (sourceCount / (duration / 1000)).toFixed(0);
         console.log(`[ingest] ✓ ${source.name}: ${sourceCount} indicators in ${duration}ms (${rate}/sec)`);
         
+        // Update network log
+        if (networkLogId) {
+          await updateNetworkLog(supabaseUrl, serviceKey, networkLogId, {
+            status: 'completed',
+            response_time_ms: duration,
+            items_processed: sourceCount,
+            status_code: 200
+          });
+        }
+        
         // Update source metadata
         await supabase
           .from('ingest_sources')
@@ -355,6 +377,16 @@ Deno.serve(async (req) => {
         const isTimeout = errorMsg.includes('aborted') || errorMsg.includes('timeout');
         
         console.error(`[ingest] ${source.name} failed:`, errorMsg);
+        
+        // Update network log
+        if (networkLogId) {
+          await updateNetworkLog(supabaseUrl, serviceKey, networkLogId, {
+            status: isTimeout ? 'timeout' : 'failed',
+            response_time_ms: duration,
+            items_processed: sourceCount,
+            error_message: errorMsg
+          });
+        }
         
         // Update source metadata
         await supabase

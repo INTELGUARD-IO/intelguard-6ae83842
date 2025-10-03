@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { supabaseQuery, supabaseRPC } from '../_shared/supabase-rest.ts';
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,16 @@ Deno.serve(async (req) => {
 
     // Step 1: Download False Positive List from Abuse.Ch
     console.log('[ABUSE-CH] Step 1: Fetching FP List from Abuse.Ch...');
+    
+    const networkLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+      call_type: 'validator',
+      target_url: 'https://hunting-api.abuse.ch/api/v1/',
+      target_name: 'Abuse.ch FP List API',
+      method: 'POST',
+      edge_function_name: 'abuse-ch-validator'
+    });
+    
+    const fpStartTime = Date.now();
     const fpResponse = await fetch('https://hunting-api.abuse.ch/api/v1/', {
       method: 'POST',
       headers: {
@@ -53,7 +64,17 @@ Deno.serve(async (req) => {
     }
 
     const fpData = await fpResponse.json();
+    const fpDuration = Date.now() - fpStartTime;
     console.log(`[ABUSE-CH] Received FP list response with ${fpData?.length || 0} entries`);
+    
+    if (networkLogId) {
+      await updateNetworkLog(supabaseUrl, supabaseServiceKey, networkLogId, {
+        status: 'completed',
+        status_code: fpResponse.status,
+        response_time_ms: fpDuration,
+        items_processed: fpData?.length || 0
+      });
+    }
 
     // Step 2: Clean expired entries and update FP list in DB
     console.log('[ABUSE-CH] Step 2: Cleaning expired FP entries...');

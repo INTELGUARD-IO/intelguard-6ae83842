@@ -1,3 +1,5 @@
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -210,6 +212,16 @@ Deno.serve(async (req) => {
         processed++;
 
         const searchUrl = `https://urlscan.io/api/v1/search/?q=domain:${encodeURIComponent(domain)}&size=10`;
+        
+        const callLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+          call_type: 'validator',
+          target_url: searchUrl,
+          target_name: `URLScan Search: ${domain}`,
+          method: 'GET',
+          edge_function_name: 'urlscan-validator'
+        });
+        
+        const callStart = Date.now();
         const response = await fetch(searchUrl, {
           method: 'GET',
           headers: {
@@ -233,6 +245,16 @@ Deno.serve(async (req) => {
         }
 
         const searchData: URLScanSearchResult = await response.json();
+        const callDuration = Date.now() - callStart;
+        
+        if (callLogId) {
+          await updateNetworkLog(supabaseUrl, supabaseServiceKey, callLogId, {
+            status: 'completed',
+            status_code: response.status,
+            response_time_ms: callDuration,
+            items_processed: searchData.results?.length || 0
+          });
+        }
 
         let maliciousScore = 0;
         let isMalicious = false;

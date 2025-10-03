@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { supabaseQuery, supabaseRPC } from '../_shared/supabase-rest.ts';
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +47,16 @@ Deno.serve(async (req) => {
     console.log('[ABUSEIPDB] Step 2: Fetching AbuseIPDB blacklist...');
     const blacklistUrl = 'https://api.abuseipdb.com/api/v2/blacklist?confidenceMinimum=70&limit=10000';
     
+    const networkLogId = await logNetworkCall(supabaseUrl, supabaseKey, {
+      call_type: 'validator',
+      target_url: blacklistUrl,
+      target_name: 'AbuseIPDB Blacklist API',
+      method: 'GET',
+      edge_function_name: 'abuseipdb-validator',
+      items_total: 10000
+    });
+    
+    const startTime = Date.now();
     const blacklistResponse = await fetch(blacklistUrl, {
       method: 'GET',
       headers: {
@@ -59,7 +70,17 @@ Deno.serve(async (req) => {
     }
 
     const blacklistData: AbuseIPDBBlacklistResponse = await blacklistResponse.json();
+    const duration = Date.now() - startTime;
     console.log(`[ABUSEIPDB] Fetched ${blacklistData.data.length} IPs from blacklist`);
+    
+    if (networkLogId) {
+      await updateNetworkLog(supabaseUrl, supabaseKey, networkLogId, {
+        status: 'completed',
+        status_code: blacklistResponse.status,
+        response_time_ms: duration,
+        items_processed: blacklistData.data.length
+      });
+    }
 
     // Step 3: Store blacklist in database (batch upsert)
     console.log('[ABUSEIPDB] Step 3: Storing blacklist in database...');

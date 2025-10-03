@@ -1,4 +1,5 @@
 import { supabaseQuery } from '../_shared/supabase-rest.ts';
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,6 +111,16 @@ Deno.serve(async (req) => {
         if (kind === 'ipv4') {
           // IP Address lookup
           endpoint = `https://www.virustotal.com/api/v3/ip_addresses/${indicator}`;
+          
+          const callLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+            call_type: 'validator',
+            target_url: endpoint,
+            target_name: `VirusTotal IP: ${indicator}`,
+            method: 'GET',
+            edge_function_name: 'virustotal-validator'
+          });
+          
+          const callStart = Date.now();
           const response = await fetch(endpoint, {
             method: 'GET',
             headers: {
@@ -126,9 +137,29 @@ Deno.serve(async (req) => {
           }
 
           vtData = await response.json();
+          const callDuration = Date.now() - callStart;
+          
+          if (callLogId) {
+            await updateNetworkLog(supabaseUrl, supabaseServiceKey, callLogId, {
+              status: 'completed',
+              status_code: response.status,
+              response_time_ms: callDuration,
+              items_processed: 1
+            });
+          }
         } else if (kind === 'domain') {
           // Domain lookup - first check if it exists
           endpoint = `https://www.virustotal.com/api/v3/domains/${indicator}`;
+          
+          const callLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+            call_type: 'validator',
+            target_url: endpoint,
+            target_name: `VirusTotal Domain: ${indicator}`,
+            method: 'GET',
+            edge_function_name: 'virustotal-validator'
+          });
+          
+          const callStart = Date.now();
           const response = await fetch(endpoint, {
             method: 'GET',
             headers: {
@@ -138,9 +169,19 @@ Deno.serve(async (req) => {
           });
 
           apiCalls++;
+          const callDuration = Date.now() - callStart;
 
           if (response.ok) {
             vtData = await response.json();
+            
+            if (callLogId) {
+              await updateNetworkLog(supabaseUrl, supabaseServiceKey, callLogId, {
+                status: 'completed',
+                status_code: response.status,
+                response_time_ms: callDuration,
+                items_processed: 1
+              });
+            }
           } else if (response.status === 404) {
             // Domain not found, skip
             console.log(`Domain ${indicator} not found in VirusTotal`);

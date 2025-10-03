@@ -1,4 +1,5 @@
 import { supabaseQuery } from '../_shared/supabase-rest.ts';
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,7 +98,16 @@ Deno.serve(async (req) => {
       blocklistUrl.searchParams.append('category', 'all');
       blocklistUrl.searchParams.append('checksum', 'false');
 
+      const networkLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+        call_type: 'validator',
+        target_url: blocklistUrl.toString(),
+        target_name: 'NeutrinoAPI Blocklist Download',
+        method: 'GET',
+        edge_function_name: 'neutrinoapi-validator'
+      });
+      
       console.log('Trying GET method with query params...');
+      const blStartTime = Date.now();
       const blocklistResponse = await fetch(blocklistUrl.toString(), {
         method: 'GET',
         headers: {
@@ -116,8 +126,18 @@ Deno.serve(async (req) => {
       }
 
       const blocklistText = await blocklistResponse.text();
+      const blDuration = Date.now() - blStartTime;
       console.log(`Raw response length: ${blocklistText.length} chars`);
       console.log(`First 500 chars:`, blocklistText.substring(0, 500));
+      
+      if (networkLogId) {
+        await updateNetworkLog(supabaseUrl, supabaseServiceKey, networkLogId, {
+          status: 'completed',
+          status_code: blocklistResponse.status,
+          response_time_ms: blDuration,
+          bytes_transferred: blocklistText.length
+        });
+      }
       
       const blocklistLines = blocklistText.trim().split('\n').filter(line => line && !line.startsWith('#'));
       console.log(`Downloaded ${blocklistLines.length} blocklist entries\n`);

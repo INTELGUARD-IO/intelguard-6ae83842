@@ -1,3 +1,5 @@
+import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
@@ -46,6 +48,16 @@ Deno.serve(async (req) => {
 
     // Step 1: Fetch bad hosts from HoneyDB API
     console.log('Fetching bad hosts from HoneyDB...');
+    
+    const networkLogId = await logNetworkCall(supabaseUrl, supabaseServiceKey, {
+      call_type: 'validator',
+      target_url: 'https://honeydb.io/api/bad-hosts',
+      target_name: 'HoneyDB Bad Hosts API',
+      method: 'GET',
+      edge_function_name: 'honeydb-validator'
+    });
+    
+    const startTime = Date.now();
     const honeydbResponse = await fetch('https://honeydb.io/api/bad-hosts', {
       method: 'GET',
       headers: {
@@ -60,7 +72,17 @@ Deno.serve(async (req) => {
     }
 
     const badHosts: HoneyDBBadHost[] = await honeydbResponse.json();
+    const duration = Date.now() - startTime;
     console.log(`Fetched ${badHosts.length} bad hosts from HoneyDB`);
+    
+    if (networkLogId) {
+      await updateNetworkLog(supabaseUrl, supabaseServiceKey, networkLogId, {
+        status: 'completed',
+        status_code: honeydbResponse.status,
+        response_time_ms: duration,
+        items_processed: badHosts.length
+      });
+    }
 
     if (badHosts.length === 0) {
       return new Response(
