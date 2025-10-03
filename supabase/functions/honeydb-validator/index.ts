@@ -15,11 +15,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate CRON_SECRET if provided
+    // Validate CRON_SECRET or JWT authorization
     const cronSecret = req.headers.get('x-cron-secret');
     const expectedSecret = Deno.env.get('CRON_SECRET');
-    if (expectedSecret && cronSecret !== expectedSecret) {
-      console.error('Invalid CRON_SECRET');
+    const authHeader = req.headers.get('authorization');
+    
+    // Allow if valid CRON_SECRET is provided
+    const validCronSecret = expectedSecret && cronSecret === expectedSecret;
+    // Allow if valid JWT authorization is provided
+    const validAuth = authHeader && authHeader.startsWith('Bearer ');
+    
+    if (!validCronSecret && !validAuth) {
+      console.error('Unauthorized: Invalid CRON_SECRET and no valid authorization header');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
