@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { AuditLogsTab } from '@/components/AuditLogsTab';
 import {
   Table,
   TableBody,
@@ -50,12 +51,68 @@ export default function System() {
     return null;
   }
 
+  const logOperation = async (
+    operationName: string,
+    operationType: 'manual_run' | 'cron_run',
+    status: 'started' | 'completed' | 'failed',
+    description?: string,
+    executionTimeMs?: number
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (status === 'started') {
+        const { data, error } = await supabase
+          .from('system_audit_logs')
+          .insert({
+            user_id: user?.id,
+            operation_name: operationName,
+            operation_type: operationType,
+            description,
+            status: 'started',
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data?.id;
+      } else {
+        // Update existing log
+        const { data: logs } = await supabase
+          .from('system_audit_logs')
+          .select('id')
+          .eq('operation_name', operationName)
+          .eq('user_id', user?.id)
+          .eq('status', 'started')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (logs && logs.length > 0) {
+          await supabase
+            .from('system_audit_logs')
+            .update({
+              status,
+              execution_time_ms: executionTimeMs,
+              description,
+            })
+            .eq('id', logs[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error logging operation:', error);
+    }
+  };
+
   const testEdgeFunction = async (functionName: string) => {
     setLoading({ ...loading, [functionName]: true });
     
     const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator'];
     const isValidator = validators.includes(functionName);
     let interval: NodeJS.Timeout | null = null;
+    const startTime = Date.now();
+    
+    // Log operation start
+    await logOperation(functionName, 'manual_run', 'started', `Esecuzione manuale di ${functionName}`);
     
     try {
       // Start progress tracking for validators
@@ -71,6 +128,17 @@ export default function System() {
 
       if (error) throw error;
 
+      const executionTime = Date.now() - startTime;
+      
+      // Log success
+      await logOperation(
+        functionName, 
+        'manual_run', 
+        'completed', 
+        `Completato con successo in ${(executionTime / 1000).toFixed(1)}s`,
+        executionTime
+      );
+
       toast.success(`${functionName} executed successfully`);
       console.log(`${functionName} result:`, data);
       
@@ -79,6 +147,17 @@ export default function System() {
         await trackValidatorProgress(functionName);
       }
     } catch (error: any) {
+      const executionTime = Date.now() - startTime;
+      
+      // Log failure
+      await logOperation(
+        functionName,
+        'manual_run',
+        'failed',
+        `Errore: ${error.message || 'Unknown error'}`,
+        executionTime
+      );
+      
       console.error(`Error executing ${functionName}:`, error);
       toast.error(error.message || `Failed to execute ${functionName}`);
     } finally {
@@ -274,6 +353,7 @@ export default function System() {
           <TabsTrigger value="validation">Validation Pipeline</TabsTrigger>
           <TabsTrigger value="cron">Cron Jobs</TabsTrigger>
           <TabsTrigger value="logs">Access Logs</TabsTrigger>
+          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="functions" className="space-y-4">
@@ -915,6 +995,10 @@ export default function System() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <AuditLogsTab />
         </TabsContent>
       </Tabs>
     </div>

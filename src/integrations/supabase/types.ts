@@ -523,6 +523,42 @@ export type Database = {
           },
         ]
       }
+      system_audit_logs: {
+        Row: {
+          created_at: string
+          description: string | null
+          execution_time_ms: number | null
+          id: string
+          metadata: Json | null
+          operation_name: string
+          operation_type: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          metadata?: Json | null
+          operation_name: string
+          operation_type: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          metadata?: Json | null
+          operation_name?: string
+          operation_type?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tenant_members: {
         Row: {
           created_at: string
