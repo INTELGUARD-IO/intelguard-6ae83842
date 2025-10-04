@@ -183,18 +183,49 @@ const Monitoring = () => {
   const loadMetrics = async () => {
     try {
       // Use RPC function to get raw indicators stats efficiently
-      const { data: statsData } = await supabase.rpc('get_raw_indicator_stats' as any);
-      const rawCount = statsData?.[0]?.total_count || 0;
-      setRawIndicators(Number(rawCount));
-
-      // Indicators by type from RPC
-      if (statsData?.[0]) {
-        const stats = statsData[0];
-        const typeCounts = [
-          { label: 'ipv4', value: Number(stats.ipv4_count) },
-          { label: 'domain', value: Number(stats.domain_count) }
-        ].filter(item => item.value > 0);
-        setIndicatorsByType(typeCounts);
+      const { data: statsData, error: statsError } = await supabase.rpc('get_raw_indicator_stats' as any);
+      
+      if (statsError) {
+        console.error('❌ Error calling get_raw_indicator_stats:', statsError);
+        toast({
+          title: "Errore caricamento Raw Indicators",
+          description: statsError.message,
+          variant: "destructive",
+        });
+        
+        // Fallback: direct count query
+        console.log('🔄 Attempting fallback direct count query...');
+        const { count: directCount, error: countError } = await supabase
+          .from('raw_indicators')
+          .select('*', { count: 'exact', head: true })
+          .is('removed_at', null);
+        
+        if (!countError) {
+          console.log('✅ Fallback successful. Raw indicators count:', directCount);
+          setRawIndicators(directCount || 0);
+        } else {
+          console.error('❌ Fallback query failed:', countError);
+        }
+      } else {
+        console.log('📊 Raw indicator stats from RPC:', statsData);
+        
+        if (statsData && statsData.length > 0) {
+          const stats = statsData[0];
+          const rawCount = Number(stats.total_count) || 0;
+          console.log('🔢 Setting rawIndicators to:', rawCount);
+          setRawIndicators(rawCount);
+          
+          // Indicators by type from RPC
+          const typeCounts = [
+            { label: 'ipv4', value: Number(stats.ipv4_count) || 0 },
+            { label: 'domain', value: Number(stats.domain_count) || 0 }
+          ].filter(item => item.value > 0);
+          console.log('📈 Indicators by type:', typeCounts);
+          setIndicatorsByType(typeCounts);
+        } else {
+          console.warn('⚠️ No data returned from get_raw_indicator_stats');
+          setRawIndicators(0);
+        }
       }
 
       // Dynamic indicators count
@@ -215,7 +246,12 @@ const Monitoring = () => {
         .select('*', { count: 'exact', head: true });
       setVendorChecks(vendorCount || 0);
     } catch (error) {
-      console.error('Error loading metrics:', error);
+      console.error('❌ Error loading metrics:', error);
+      toast({
+        title: "Errore caricamento metriche",
+        description: "Si è verificato un errore durante il caricamento delle metriche",
+        variant: "destructive",
+      });
     }
   };
 
