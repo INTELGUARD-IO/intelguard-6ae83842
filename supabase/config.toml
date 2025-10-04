@@ -2,7 +2,7 @@ project_id = "qmsidlazqaqwcptpsjqh"
 
 [functions.intelligent-validator]
 verify_jwt = false
-schedule = "0 */2 * * *"
+schedule = "0 * * * *"
 
 [functions.whitelist-cross-validator]
 verify_jwt = false
