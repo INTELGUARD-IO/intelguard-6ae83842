@@ -6,25 +6,35 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET');
 
 const BATCH_SIZE = 100; // Indicators per run
-const CONFIDENCE_THRESHOLD = 70; // Minimum confidence for validated_indicators
-const AGREEMENT_THRESHOLD = 2; // Minimum vendor agreement
+
+// Two-phase validation thresholds
+const PHASE1_CONFIDENCE_THRESHOLD = 50; // Broad validation with generous validators
+const PHASE1_AGREEMENT_THRESHOLD = 1;
+const PHASE2_CONFIDENCE_THRESHOLD = 70; // Strict validation with rate-limited validators
+const PHASE2_AGREEMENT_THRESHOLD = 2;
+
+// Validator priority groups
+const HIGH_PRIORITY_VALIDATORS = ['neutrinoapi', 'safebrowsing', 'otx', 'virustotal'];
+const LOW_PRIORITY_VALIDATORS = ['abuseipdb', 'honeydb', 'censys', 'urlscan'];
 
 // Validator weights for score aggregation
 const VALIDATOR_WEIGHTS: Record<string, number> = {
-  abuseipdb: 1.5,
+  // High priority (generous API limits)
+  neutrinoapi: 1.0,
+  safebrowsing: 1.2,
+  otx: 1.3,
   virustotal: 1.5,
-  otx: 1.2,
-  urlscan: 1.0,
-  safebrowsing: 1.0,
-  neutrinoapi: 0.8,
+  // Low priority (strict rate limits)
+  abuseipdb: 1.5,
   honeydb: 0.8,
   censys: 0.7,
+  urlscan: 1.0,
   abuse_ch: 0.7,
 };
 
 // Validators by indicator type
-const IP_VALIDATORS = ['abuseipdb', 'neutrinoapi', 'honeydb', 'censys', 'otx', 'virustotal', 'safebrowsing'];
-const DOMAIN_VALIDATORS = ['abuse_ch', 'urlscan', 'otx', 'virustotal', 'safebrowsing'];
+const IP_VALIDATORS = ['neutrinoapi', 'safebrowsing', 'otx', 'virustotal', 'honeydb', 'abuseipdb', 'censys'];
+const DOMAIN_VALIDATORS = ['safebrowsing', 'otx', 'virustotal', 'urlscan', 'abuse_ch'];
 
 interface IndicatorToValidate {
   id: number;
@@ -62,22 +72,17 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Step 1: Fetch batch of unvalidated indicators
+    // Step 1: Fetch batch prioritizing indicators missing high-priority validators
     const { data: indicators, error: fetchError } = await supabase
       .from('dynamic_raw_indicators')
-      .select('id, indicator, kind, source_count')
+      .select('id, indicator, kind, source_count, confidence')
       .or(
         'confidence.is.null,' +
-        'confidence.lt.70,' +
-        'abuseipdb_checked.eq.false,' +
-        'otx_checked.eq.false,' +
-        'virustotal_checked.eq.false,' +
-        'safebrowsing_checked.eq.false,' +
-        'abuse_ch_checked.eq.false,' +
-        'urlscan_checked.eq.false,' +
+        'confidence.lt.50,' +
         'neutrinoapi_checked.eq.false,' +
-        'honeydb_checked.eq.false,' +
-        'censys_checked.eq.false'
+        'safebrowsing_checked.eq.false,' +
+        'otx_checked.eq.false,' +
+        'virustotal_checked.eq.false'
       )
       .order('source_count', { ascending: false })
       .order('first_validated', { ascending: true })
@@ -124,8 +129,14 @@ Deno.serve(async (req) => {
         // Update dynamic_raw_indicators
         await updateIndicatorValidation(supabase, indicator.id, results, confidence);
 
+        // Two-phase validation logic
+        const currentConfidence = (indicator as any).confidence || 0;
+        const isPhase1 = currentConfidence < PHASE1_CONFIDENCE_THRESHOLD;
+        const threshold = isPhase1 ? PHASE1_CONFIDENCE_THRESHOLD : PHASE2_CONFIDENCE_THRESHOLD;
+        const agreementNeeded = isPhase1 ? PHASE1_AGREEMENT_THRESHOLD : PHASE2_AGREEMENT_THRESHOLD;
+
         // Insert into validated_indicators if meets criteria
-        if (confidence >= CONFIDENCE_THRESHOLD && agreementCount >= AGREEMENT_THRESHOLD && !isWhitelisted) {
+        if (confidence >= threshold && agreementCount >= agreementNeeded && !isWhitelisted) {
           await insertValidatedIndicator(supabase, indicator, results, confidence);
           inserted++;
         }
@@ -172,24 +183,136 @@ async function validateIndicator(
     let score: number | null = null;
     let malicious: boolean | null = null;
 
-    // Query vendor_checks for existing results
-    const { data: checkData } = await supabase
-      .from('vendor_checks')
-      .select('score, raw')
-      .eq('indicator', indicator.indicator)
-      .eq('kind', indicator.kind)
-      .ilike('vendor', validatorName)
-      .order('checked_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (checkData) {
-      checked = true;
-      score = checkData.score;
+    // Query validator-specific tables
+    if (validatorName === 'abuseipdb') {
+      const { data: blacklistData } = await supabase
+        .from('abuseipdb_blacklist')
+        .select('abuse_confidence_score')
+        .eq('indicator', indicator.indicator)
+        .maybeSingle();
       
-      // Determine malicious flag based on score
-      if (score !== null) {
-        malicious = score >= 50;
+      if (blacklistData) {
+        checked = true;
+        score = blacklistData.abuse_confidence_score;
+        malicious = (score !== null && score >= 50);
+      }
+    } else if (validatorName === 'otx') {
+      const { data: otxData } = await supabase
+        .from('otx_enrichment')
+        .select('score, verdict')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .maybeSingle();
+      
+      if (otxData) {
+        checked = true;
+        score = otxData.score || 0;
+        malicious = (otxData.verdict === 'malicious' || (score !== null && score >= 50));
+      }
+    } else if (validatorName === 'neutrinoapi') {
+      const { data: neutrinoData } = await supabase
+        .from('neutrinoapi_blocklist')
+        .select('category')
+        .eq('indicator', indicator.indicator)
+        .maybeSingle();
+      
+      checked = true; // NeutrinoAPI always checks
+      if (neutrinoData) {
+        score = 100;
+        malicious = true;
+      } else {
+        score = 0;
+        malicious = false;
+      }
+    } else if (validatorName === 'safebrowsing') {
+      const { data: sbData } = await supabase
+        .from('google_safebrowsing_cache')
+        .select('score, is_threat')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .maybeSingle();
+      
+      if (sbData) {
+        checked = true;
+        score = sbData.score || 0;
+        malicious = sbData.is_threat || false;
+      }
+    } else if (validatorName === 'honeydb') {
+      const { data: honeyData } = await supabase
+        .from('honeydb_blacklist')
+        .select('threat_score')
+        .eq('indicator', indicator.indicator)
+        .maybeSingle();
+      
+      if (honeyData) {
+        checked = true;
+        score = honeyData.threat_score || 100;
+        malicious = true;
+      }
+    } else if (validatorName === 'virustotal') {
+      const { data: vtData } = await supabase
+        .from('vendor_checks')
+        .select('score, raw')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .ilike('vendor', 'virustotal')
+        .order('checked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (vtData) {
+        checked = true;
+        score = vtData.score;
+        malicious = (score !== null && score >= 50);
+      }
+    } else if (validatorName === 'abuse_ch') {
+      const { data: abusechData } = await supabase
+        .from('abuse_ch_fplist')
+        .select('indicator')
+        .eq('indicator', indicator.indicator)
+        .maybeSingle();
+      
+      checked = true; // Abuse.ch always checks
+      if (abusechData) {
+        // In FP list = not malicious
+        score = 0;
+        malicious = false;
+      } else {
+        // Not in FP list = potentially malicious
+        score = null;
+        malicious = null;
+      }
+    } else if (validatorName === 'urlscan') {
+      const { data: urlscanData } = await supabase
+        .from('vendor_checks')
+        .select('score, raw')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .ilike('vendor', 'urlscan')
+        .order('checked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (urlscanData) {
+        checked = true;
+        score = urlscanData.score;
+        malicious = (score !== null && score >= 50);
+      }
+    } else if (validatorName === 'censys') {
+      const { data: censysData } = await supabase
+        .from('vendor_checks')
+        .select('score, raw')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .ilike('vendor', 'censys')
+        .order('checked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (censysData) {
+        checked = true;
+        score = censysData.score;
+        malicious = (score !== null && score >= 50);
       }
     }
 
