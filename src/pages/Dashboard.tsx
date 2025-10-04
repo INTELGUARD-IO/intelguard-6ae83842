@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Globe, Activity, TrendingUp, Database, Layers, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Shield, Globe, Activity, TrendingUp, Database, Layers, Filter, PlayCircle, RefreshCcw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Stats {
   // Raw indicators (from raw_indicators table)
@@ -58,10 +60,48 @@ export default function Dashboard() {
     lastWhitelistSync: null,
   });
   const [loading, setLoading] = useState(true);
+  const [syncingWhitelist, setSyncingWhitelist] = useState(false);
+  const [validatingDomains, setValidatingDomains] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, []);
+
+  const syncWhitelist = async () => {
+    setSyncingWhitelist(true);
+    try {
+      toast.info('🔄 Syncing Top 100K domains from Cloudflare Radar...');
+      const { error } = await supabase.functions.invoke('cloudflare-radar-domains-sync');
+      
+      if (error) throw error;
+      
+      toast.success('✅ Top 100K domains synced successfully!');
+      await loadStats(); // Reload stats
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast.error(`❌ Sync failed: ${error.message}`);
+    } finally {
+      setSyncingWhitelist(false);
+    }
+  };
+
+  const validateDomains = async () => {
+    setValidatingDomains(true);
+    try {
+      toast.info('🔍 Running domain validation against whitelist...');
+      const { error } = await supabase.functions.invoke('cloudflare-radar-domain-validator');
+      
+      if (error) throw error;
+      
+      toast.success('✅ Domain validation completed!');
+      await loadStats(); // Reload stats
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      toast.error(`❌ Validation failed: ${error.message}`);
+    } finally {
+      setValidatingDomains(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -406,8 +446,30 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Cloudflare Radar Whitelist</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Cloudflare Radar Whitelist</h3>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={syncWhitelist}
+                        disabled={syncingWhitelist}
+                      >
+                        <RefreshCcw className={`h-3 w-3 mr-1 ${syncingWhitelist ? 'animate-spin' : ''}`} />
+                        Sync
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={validateDomains}
+                        disabled={validatingDomains || stats.whitelistDomains === 0}
+                      >
+                        <PlayCircle className={`h-3 w-3 mr-1 ${validatingDomains ? 'animate-pulse' : ''}`} />
+                        Validate
+                      </Button>
+                    </div>
+                  </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span>Top 100K Cached</span>
