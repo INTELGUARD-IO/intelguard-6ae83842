@@ -507,6 +507,40 @@ export default function System() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Cloudflare Radar
+                </CardTitle>
+                <CardDescription>
+                  Enrich with ASN, country, and prefix data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Fetches Cloudflare Radar data (ASN, AS name, country) for IPv4 indicators.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('cloudflare-radar-enrich')}
+                  disabled={loading['cloudflare-radar-enrich']}
+                  className="w-full"
+                >
+                  {loading['cloudflare-radar-enrich'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Cloudflare Radar
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
                   Abuse.ch Validator
                 </CardTitle>

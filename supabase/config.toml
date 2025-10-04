@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.bgpview-enrich]
 verify_jwt = false
 
+[functions.cloudflare-radar-enrich]
+verify_jwt = false
+
 [functions.abuse-ch-validator]
 verify_jwt = false
 

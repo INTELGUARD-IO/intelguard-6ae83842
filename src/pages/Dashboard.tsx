@@ -25,6 +25,10 @@ interface Stats {
   bgpviewEnriched: number;
   bgpviewPtrCount: number;
   bgpviewTopCountries: string[];
+  
+  // Cloudflare Radar enrichment stats
+  cfRadarEnriched: number;
+  cfRadarTopCountries: string[];
 }
 
 export default function Dashboard() {
@@ -42,6 +46,8 @@ export default function Dashboard() {
     bgpviewEnriched: 0,
     bgpviewPtrCount: 0,
     bgpviewTopCountries: [],
+    cfRadarEnriched: 0,
+    cfRadarTopCountries: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +68,9 @@ export default function Dashboard() {
         { count: enrichedCount },
         { data: enrichedData },
         { count: bgpviewCount },
-        { data: bgpviewData }
+        { data: bgpviewData },
+        { count: cfRadarCount },
+        { data: cfRadarData }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -80,7 +88,11 @@ export default function Dashboard() {
         // BGPview enrichment count
         supabase.from('bgpview_enrichment').select('*', { count: 'exact', head: true }),
         // BGPview data for PTR and country stats
-        supabase.from('bgpview_enrichment').select('ptr_record, country_code').gt('expires_at', new Date().toISOString())
+        supabase.from('bgpview_enrichment').select('ptr_record, country_code').gt('expires_at', new Date().toISOString()),
+        // Cloudflare Radar enrichment count
+        supabase.from('cloudflare_radar_enrichment').select('*', { count: 'exact', head: true }),
+        // Cloudflare Radar data for country stats
+        supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString())
       ]);
 
       // Calculate unique sources
@@ -122,6 +134,18 @@ export default function Dashboard() {
         .slice(0, 5)
         .map(([country]) => country);
 
+      // Cloudflare Radar stats
+      const cfRadarCountryCounts: Record<string, number> = {};
+      cfRadarData?.forEach(item => {
+        if (item.country_code) {
+          cfRadarCountryCounts[item.country_code] = (cfRadarCountryCounts[item.country_code] || 0) + 1;
+        }
+      });
+      const cfRadarTopCountries = Object.entries(cfRadarCountryCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([country]) => country);
+
       setStats({
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
@@ -136,6 +160,8 @@ export default function Dashboard() {
         bgpviewEnriched: bgpviewCount || 0,
         bgpviewPtrCount,
         bgpviewTopCountries,
+        cfRadarEnriched: cfRadarCount || 0,
+        cfRadarTopCountries,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -347,6 +373,10 @@ export default function Dashboard() {
                       <span className="font-mono">{stats.bgpviewEnriched.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
+                      <span>Cloudflare Radar</span>
+                      <span className="font-mono">{stats.cfRadarEnriched.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
                       <span>PTR Records</span>
                       <span className="font-mono">{stats.bgpviewPtrCount.toLocaleString()}</span>
                     </div>
@@ -354,7 +384,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
+              <div className="grid gap-4 md:grid-cols-3 pt-4 border-t">
                 {stats.topCountries.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium">Top Countries (RIPEstat)</h3>
@@ -378,6 +408,19 @@ export default function Dashboard() {
                       {stats.bgpviewTopCountries.map((country) => (
                         <div key={country} className="flex items-center text-sm">
                           <span className="font-mono text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{country}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {stats.cfRadarTopCountries.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Top Countries (Cloudflare)</h3>
+                    <div className="space-y-1">
+                      {stats.cfRadarTopCountries.map((country) => (
+                        <div key={country} className="flex items-center text-sm">
+                          <span className="font-mono text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">{country}</span>
                         </div>
                       ))}
                     </div>

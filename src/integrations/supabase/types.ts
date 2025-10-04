@@ -131,6 +131,45 @@ export type Database = {
         }
         Relationships: []
       }
+      cloudflare_radar_enrichment: {
+        Row: {
+          asn: number | null
+          asn_name: string | null
+          checked_at: string
+          country_code: string | null
+          expires_at: string
+          id: string
+          indicator: string
+          kind: string
+          prefix: string | null
+          raw_response: Json | null
+        }
+        Insert: {
+          asn?: number | null
+          asn_name?: string | null
+          checked_at?: string
+          country_code?: string | null
+          expires_at?: string
+          id?: string
+          indicator: string
+          kind?: string
+          prefix?: string | null
+          raw_response?: Json | null
+        }
+        Update: {
+          asn?: number | null
+          asn_name?: string | null
+          checked_at?: string
+          country_code?: string | null
+          expires_at?: string
+          id?: string
+          indicator?: string
+          kind?: string
+          prefix?: string | null
+          raw_response?: Json | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -1020,6 +1059,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_bgpview_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_cf_radar_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
