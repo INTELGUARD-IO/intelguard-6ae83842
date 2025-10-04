@@ -46,7 +46,7 @@ serve(async (req: Request) => {
       "POST",
       {
         operation_name: "cloudflare_radar_domains_sync",
-        operation_type: "validator",
+        operation_type: "cron_run",
         status: "started",
         description: "Syncing Top 100K domains from Cloudflare Radar"
       }

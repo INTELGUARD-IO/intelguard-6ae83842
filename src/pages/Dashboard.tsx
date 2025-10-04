@@ -117,7 +117,7 @@ export default function Dashboard() {
       const [
         { count: rawIpv4Count },
         { count: rawDomainCount },
-        { data: sourcesData },
+        { data: enabledSourcesData },
         { count: validatedIpv4Count },
         { count: validatedDomainCount },
         { data: deltaData },
@@ -137,7 +137,7 @@ export default function Dashboard() {
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').is('removed_at', null),
-        supabase.from('raw_indicators').select('source').is('removed_at', null),
+        supabase.from('ingest_sources').select('*').eq('enabled', true),
         // Validated indicators from dynamic_raw_indicators
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
@@ -169,8 +169,8 @@ export default function Dashboard() {
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('safebrowsing_checked', true).gte('safebrowsing_score', 50)
       ]);
 
-      // Calculate unique sources
-      const uniqueSources = new Set(sourcesData?.map(d => d.source) || []).size;
+      // Count active enabled sources
+      const activeSourcesCount = enabledSourcesData?.length || 0;
 
       // Calculate recent delta
       let recentDelta = null;
@@ -227,7 +227,7 @@ export default function Dashboard() {
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
         rawDomains: rawDomainCount || 0,
-        rawSources: uniqueSources,
+        rawSources: activeSourcesCount,
         validatedTotal: (validatedIpv4Count || 0) + (validatedDomainCount || 0),
         validatedIpv4: validatedIpv4Count || 0,
         validatedDomains: validatedDomainCount || 0,

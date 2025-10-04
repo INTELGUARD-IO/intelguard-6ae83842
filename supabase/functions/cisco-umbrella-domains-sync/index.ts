@@ -34,7 +34,7 @@ serve(async (req: Request) => {
       'system_audit_logs',
       'POST',
       {
-        operation_type: 'data_sync',
+        operation_type: 'cron_run',
         operation_name: 'cisco_umbrella_domains_sync',
         description: 'Syncing Cisco Umbrella Top 100K domains',
         status: 'started',
