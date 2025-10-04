@@ -194,7 +194,7 @@ serve(async (req) => {
     const { data: superAdminData } = await supabase
       .rpc('get_super_admin_email');
 
-    const recipientEmail = superAdminData || 'admin@intelguard.local';
+    const recipientEmail = superAdminData || 'luca.salvatori.pisa@gmail.com';
 
     // Send email via Resend API
     const emailResponse = await fetch('https://api.resend.com/emails', {

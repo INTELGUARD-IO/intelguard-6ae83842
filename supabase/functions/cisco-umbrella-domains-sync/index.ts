@@ -78,30 +78,25 @@ serve(async (req: Request) => {
       const zipData = await response.arrayBuffer();
       console.log(`[CISCO-UMBRELLA-SYNC] Downloaded ${zipData.byteLength} bytes`);
 
-      // Decompress ZIP using Deno's built-in decompression
-      const zipFile = new Uint8Array(zipData);
+      // Decompress ZIP using jszip library
+      console.log('[CISCO-UMBRELLA-SYNC] Extracting CSV from ZIP...');
+      const decompressStartTime = Date.now();
       
-      // Use DecompressionStream for ZIP files
-      const decompressStream = new DecompressionStream('deflate-raw');
-      const reader = new Response(zipFile.slice(30)).body // Skip ZIP header (30 bytes)
-        ?.pipeThrough(decompressStream)
-        .getReader();
-
-      if (!reader) {
-        throw new Error('Failed to create decompression stream');
-      }
-
-      // Read decompressed data
-      let csvText = '';
-      const decoder = new TextDecoder();
+      // Import jszip
+      const JSZip = (await import('https://esm.sh/jszip@3.10.1')).default;
       
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        csvText += decoder.decode(value, { stream: true });
+      const zip = new JSZip();
+      const zipContent = await zip.loadAsync(zipData);
+      
+      // Get the CSV file
+      const csvFile = zipContent.file('top-1m.csv');
+      if (!csvFile) {
+        throw new Error('CSV file not found in ZIP archive');
       }
-
-      console.log(`[CISCO-UMBRELLA-SYNC] Decompressed CSV size: ${csvText.length} chars`);
+      
+      const csvText = await csvFile.async('string');
+      const decompressTime = Date.now() - decompressStartTime;
+      console.log(`[CISCO-UMBRELLA-SYNC] Extracted CSV (${(csvText.length / 1024 / 1024).toFixed(2)} MB) in ${decompressTime}ms`);
 
       // Parse CSV and extract top 100k domains
       const lines = csvText.split('\n').filter(line => line.trim());

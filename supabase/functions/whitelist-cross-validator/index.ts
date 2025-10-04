@@ -37,12 +37,13 @@ serve(async (req) => {
 
     // Step 2: Fetch raw indicators without confidence or not whitelisted
     console.log('🔎 Fetching raw indicators to validate...');
+    const startTime = Date.now();
     const { data: indicators, error: fetchError } = await supabase
       .from('dynamic_raw_indicators')
       .select('id, indicator, kind')
       .or('whitelisted.is.null,whitelisted.eq.false')
       .in('kind', ['domain'])
-      .limit(10000);
+      .limit(50000);
 
     if (fetchError) throw fetchError;
     if (!indicators || indicators.length === 0) {
@@ -117,6 +118,9 @@ serve(async (req) => {
       console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(indicators.length / batchSize)}`);
     }
 
+    const executionTime = Date.now() - startTime;
+    const processingRate = Math.round(indicators.length / (executionTime / 1000));
+    
     console.log('\n🎉 Cross-validation completed!');
     console.log(`📊 Results:`);
     console.log(`   - Total whitelisted: ${totalWhitelisted}`);
@@ -124,6 +128,8 @@ serve(async (req) => {
     console.log(`   - Cloudflare only: ${cloudflareMatches}`);
     console.log(`   - Both lists: ${bothMatches}`);
     console.log(`   - API quota saved: ~${totalWhitelisted * 10} calls`);
+    console.log(`⏱️  Execution time: ${executionTime}ms`);
+    console.log(`📈 Processing rate: ${processingRate} indicators/sec`);
 
     return new Response(JSON.stringify({
       success: true,

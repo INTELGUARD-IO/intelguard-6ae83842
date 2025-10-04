@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Database, Play, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface WhitelistStats {
   ciscoCount: number;
@@ -278,34 +279,63 @@ export default function WhitelistMetrics() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => triggerSync('cisco-umbrella-domains-sync', 'Cisco Umbrella')}
-                disabled={syncLoading['cisco-umbrella-domains-sync']}
-                variant="outline"
-                size="sm"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {syncLoading['cisco-umbrella-domains-sync'] ? 'Syncing...' : 'Sync Cisco'}
-              </Button>
-              <Button
-                onClick={() => triggerSync('cloudflare-radar-domains-sync', 'Cloudflare Radar')}
-                disabled={syncLoading['cloudflare-radar-domains-sync']}
-                variant="outline"
-                size="sm"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {syncLoading['cloudflare-radar-domains-sync'] ? 'Syncing...' : 'Sync Cloudflare'}
-              </Button>
-              <Button
-                onClick={() => triggerSync('whitelist-cross-validator', 'Cross Validator')}
-                disabled={syncLoading['whitelist-cross-validator']}
-                variant="outline"
-                size="sm"
-              >
-                <Database className="h-4 w-4 mr-2" />
-                {syncLoading['whitelist-cross-validator'] ? 'Validating...' : 'Cross-Validate'}
-              </Button>
+            <div className="flex gap-2 pt-2 flex-wrap">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => triggerSync('cisco-umbrella-domains-sync', 'Cisco Umbrella')}
+                      disabled={syncLoading['cisco-umbrella-domains-sync']}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {syncLoading['cisco-umbrella-domains-sync'] ? 'Syncing...' : 'Sync Cisco'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">🔧 Debug: Manual sync (auto-runs daily at 2 AM UTC)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => triggerSync('cloudflare-radar-domains-sync', 'Cloudflare Radar')}
+                      disabled={syncLoading['cloudflare-radar-domains-sync']}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {syncLoading['cloudflare-radar-domains-sync'] ? 'Syncing...' : 'Sync Cloudflare'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">🔧 Debug: Manual sync (auto-runs daily at 3 AM UTC)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => triggerSync('whitelist-cross-validator', 'Cross Validator')}
+                      disabled={syncLoading['whitelist-cross-validator']}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Database className="h-4 w-4 mr-2" />
+                      {syncLoading['whitelist-cross-validator'] ? 'Validating...' : 'Cross-Validate'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">🔧 Debug: Manual validation (auto-runs hourly)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </CardContent>

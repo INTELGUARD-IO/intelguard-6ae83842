@@ -2,9 +2,11 @@ project_id = "qmsidlazqaqwcptpsjqh"
 
 [functions.whitelist-cross-validator]
 verify_jwt = false
+schedule = "0 * * * *"
 
 [functions.whitelist-email-report]
 verify_jwt = false
+schedule = "0 6 * * *"
 
 [functions.validation-orchestrator]
 verify_jwt = false
@@ -17,9 +19,11 @@ verify_jwt = false
 
 [functions.cloudflare-radar-domains-sync]
 verify_jwt = false
+schedule = "0 3 * * *"
 
 [functions.cisco-umbrella-domains-sync]
 verify_jwt = false
+schedule = "0 2 * * *"
 
 [functions.cloudflare-radar-domain-validator]
 verify_jwt = false
