@@ -11,7 +11,7 @@ const BATCH_SIZE = 100; // Indicators per run
 const PHASE1_CONFIDENCE_THRESHOLD = 50; // Broad validation with generous validators
 const PHASE1_AGREEMENT_THRESHOLD = 1;
 const PHASE2_CONFIDENCE_THRESHOLD = 70; // Strict validation with rate-limited validators
-const PHASE2_AGREEMENT_THRESHOLD = 2;
+const PHASE2_AGREEMENT_THRESHOLD = 1;
 
 // Validator priority groups
 const HIGH_PRIORITY_VALIDATORS = ['neutrinoapi', 'safebrowsing', 'otx', 'virustotal'];
