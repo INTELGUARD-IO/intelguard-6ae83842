@@ -19,17 +19,37 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Step 1: Load whitelists
-    console.log('📥 Loading whitelists...');
-    const [ciscoData, cloudflareData] = await Promise.all([
-      supabase.from('cisco_umbrella_top_domains').select('domain'),
-      supabase.from('cloudflare_radar_top_domains').select('domain')
-    ]);
-
-    const ciscoSet = new Set(ciscoData.data?.map(d => d.domain.toLowerCase()) || []);
-    const cloudflareSet = new Set(cloudflareData.data?.map(d => d.domain.toLowerCase()) || []);
+    // Step 1: Load whitelists from Storage
+    console.log('📥 Loading whitelists from Storage...');
     
-    console.log(`📊 Loaded whitelists: Cisco=${ciscoSet.size}, Cloudflare=${cloudflareSet.size}`);
+    const loadDomainsFromStorage = async (fileName: string): Promise<Set<string>> => {
+      const { data, error } = await supabase.storage
+        .from('whitelists')
+        .download(fileName);
+      
+      if (error) {
+        console.warn(`⚠️ Failed to load ${fileName}: ${error.message}`);
+        return new Set();
+      }
+      
+      const csvText = await data.text();
+      const lines = csvText.split('\n').slice(1); // Skip header
+      const domains = new Set<string>();
+      
+      lines.forEach(line => {
+        const domain = line.split(',')[0]?.trim().toLowerCase();
+        if (domain) domains.add(domain);
+      });
+      
+      return domains;
+    };
+
+    const [ciscoSet, cloudflareSet] = await Promise.all([
+      loadDomainsFromStorage('cisco-umbrella-latest.csv'),
+      loadDomainsFromStorage('cloudflare-radar-latest.csv')
+    ]);
+    
+    console.log(`📊 Loaded whitelists from Storage: Cisco=${ciscoSet.size}, Cloudflare=${cloudflareSet.size}`);
 
     // Create unified set
     const unifiedWhitelist = new Set([...ciscoSet, ...cloudflareSet]);

@@ -53,10 +53,6 @@ serve(async (req: Request) => {
     );
     const auditLogId = auditLog?.[0]?.id;
 
-    // Clean expired domains
-    console.log("🧹 Cleaning expired domains...");
-    await supabaseRPC(SUPABASE_URL, SERVICE_KEY, "clean_expired_cf_radar_domains");
-
     // Download Top 100K domains from Cloudflare Radar
     console.log("📥 Downloading Top 100K domains from Cloudflare Radar...");
     const response = await fetch(
@@ -82,37 +78,51 @@ serve(async (req: Request) => {
 
     console.log(`✅ Downloaded ${domains.length} domains`);
 
-    // Batch insert domains
-    let totalInserted = 0;
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Generate CSV content
+    const csvLines = ['domain,rank'];
+    domains.forEach((domain, idx) => csvLines.push(`${domain},${idx + 1}`));
+    const csvContent = csvLines.join('\n');
+    const csvBlob = new Blob([csvContent], { type: 'text/csv' });
     
-    for (let i = 0; i < domains.length; i += BATCH_SIZE) {
-      const batch = domains.slice(i, i + BATCH_SIZE);
-      const domainRecords = batch.map((domain, idx) => ({
-        domain,
-        rank: i + idx + 1,
-        bucket: "top_100000",
-        expires_at: expiresAt,
-      }));
+    console.log(`📦 Generated CSV: ${(csvBlob.size / 1024 / 1024).toFixed(2)} MB`);
 
-      try {
-        await supabaseQuery(
-          SUPABASE_URL,
-          SERVICE_KEY,
-          "cloudflare_radar_top_domains",
-          "POST",
-          domainRecords,
-          "?on_conflict=domain"
-        );
-        totalInserted += batch.length;
-        console.log(`📦 Inserted batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} domains (Total: ${totalInserted})`);
-      } catch (error) {
-        console.error(`❌ Error inserting batch at index ${i}:`, error);
-      }
+    // Upload to Supabase Storage
+    const fileName = `cloudflare-radar-top-100k-${new Date().toISOString().split('T')[0]}.csv`;
+    
+    const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/whitelists/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'text/csv',
+        'x-upsert': 'true'
+      },
+      body: csvBlob
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`Storage upload failed: ${uploadResponse.status} ${errorText}`);
+    }
+
+    console.log(`✅ Uploaded to Storage: ${fileName}`);
+
+    // Create symlink "latest"
+    const latestResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/whitelists/cloudflare-radar-latest.csv`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'text/csv',
+        'x-upsert': 'true'
+      },
+      body: csvBlob
+    });
+
+    if (!latestResponse.ok) {
+      console.warn('⚠️ Failed to update latest symlink');
     }
 
     const executionTime = Date.now() - startTime;
-    console.log(`✅ Sync completed: ${totalInserted} domains synced in ${executionTime}ms`);
+    console.log(`✅ Sync completed: ${domains.length} domains synced in ${executionTime}ms`);
 
     // Update audit log
     if (auditLogId) {
@@ -125,8 +135,9 @@ serve(async (req: Request) => {
           status: "completed",
           execution_time_ms: executionTime,
           metadata: {
-            domains_synced: totalInserted,
+            domains_synced: domains.length,
             total_domains: domains.length,
+            storage_file: fileName
           },
         },
         `?id=eq.${auditLogId}`
@@ -151,8 +162,8 @@ serve(async (req: Request) => {
             <p>The Top 100K domains whitelist has been successfully synced.</p>
             <h3>Summary:</h3>
             <ul>
-              <li><strong>Domains Synced:</strong> ${totalInserted}</li>
-              <li><strong>Total Domains:</strong> ${domains.length}</li>
+              <li><strong>Domains Synced:</strong> ${domains.length}</li>
+              <li><strong>Storage File:</strong> ${fileName}</li>
               <li><strong>Execution Time:</strong> ${executionTime}ms</li>
               <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
             </ul>
@@ -173,8 +184,8 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        domains_synced: totalInserted,
-        total_domains: domains.length,
+        domains_synced: domains.length,
+        storage_file: fileName,
         execution_time_ms: executionTime,
       }),
       {

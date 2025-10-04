@@ -127,8 +127,6 @@ export default function Dashboard() {
         { data: bgpviewData },
         { count: cfRadarCount },
         { data: cfRadarData },
-        { count: whitelistCount },
-        { data: whitelistData },
         { count: whitelistedCount },
         { count: otxValidatedCount },
         { count: safeBrowsingValidatedCount },
@@ -155,10 +153,6 @@ export default function Dashboard() {
         supabase.from('cloudflare_radar_enrichment').select('*', { count: 'exact', head: true }),
         // Cloudflare Radar data for country stats
         supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString()),
-        // Cloudflare Radar whitelist domains count
-        supabase.from('cloudflare_radar_top_domains').select('*', { count: 'exact', head: true }).gt('expires_at', new Date().toISOString()),
-        // Cloudflare Radar whitelist domains with last sync
-        supabase.from('cloudflare_radar_top_domains').select('added_at').gt('expires_at', new Date().toISOString()).order('added_at', { ascending: false }).limit(1),
         // Whitelisted indicators (confidence = 0)
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0),
         // OTX validated indicators
@@ -220,9 +214,6 @@ export default function Dashboard() {
         .slice(0, 5)
         .map(([country]) => country);
 
-      // Whitelist stats
-      const lastWhitelistSync = whitelistData && whitelistData.length > 0 ? whitelistData[0].added_at : null;
-
       setStats({
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
@@ -239,9 +230,9 @@ export default function Dashboard() {
         bgpviewTopCountries,
         cfRadarEnriched: cfRadarCount || 0,
         cfRadarTopCountries,
-        whitelistDomains: whitelistCount || 0,
+        whitelistDomains: 0,
         whitelistedIndicators: whitelistedCount || 0,
-        lastWhitelistSync,
+        lastWhitelistSync: null,
         otxValidated: otxValidatedCount || 0,
         safeBrowsingValidated: safeBrowsingValidatedCount || 0,
         safeBrowsingThreats: safeBrowsingThreatsCount || 0,

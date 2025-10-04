@@ -59,17 +59,35 @@ export default function WhitelistMetrics() {
     try {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Load whitelist counts
-      const [ciscoRes, cloudflareRes] = await Promise.all([
-        supabase.from('cisco_umbrella_top_domains').select('*', { count: 'exact', head: true }),
-        supabase.from('cloudflare_radar_top_domains').select('*', { count: 'exact', head: true })
+      // Load whitelist counts from Storage files
+      const [ciscoFile, cloudflareFile] = await Promise.all([
+        supabase.storage.from('whitelists').list('', { 
+          search: 'cisco-umbrella-latest.csv',
+          limit: 1
+        }),
+        supabase.storage.from('whitelists').list('', {
+          search: 'cloudflare-radar-latest.csv', 
+          limit: 1
+        })
       ]);
 
-      // Load last sync times
-      const [ciscoLastSync, cloudflareLastSync] = await Promise.all([
-        supabase.from('cisco_umbrella_top_domains').select('added_at').order('added_at', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('cloudflare_radar_top_domains').select('added_at').order('added_at', { ascending: false }).limit(1).maybeSingle()
+      // Download and count domains from CSV files
+      const countDomainsInCSV = async (fileName: string): Promise<number> => {
+        const { data, error } = await supabase.storage.from('whitelists').download(fileName);
+        if (error || !data) return 0;
+        
+        const text = await data.text();
+        const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('domain'));
+        return lines.length;
+      };
+
+      const [ciscoCount, cloudflareCount] = await Promise.all([
+        countDomainsInCSV('cisco-umbrella-latest.csv'),
+        countDomainsInCSV('cloudflare-radar-latest.csv')
       ]);
+
+      const ciscoLastSync = ciscoFile.data?.[0]?.created_at || null;
+      const cloudflareLastSync = cloudflareFile.data?.[0]?.created_at || null;
 
       // Load today's coverage
       const [whitelistedToday, deepValidatedToday] = await Promise.all([
@@ -89,12 +107,12 @@ export default function WhitelistMetrics() {
         : 0;
 
       setStats({
-        ciscoCount: ciscoRes.count || 0,
-        cloudflareCount: cloudflareRes.count || 0,
-        totalUnique: Math.max(ciscoRes.count || 0, cloudflareRes.count || 0),
+        ciscoCount,
+        cloudflareCount,
+        totalUnique: Math.max(ciscoCount, cloudflareCount),
         lastSync: {
-          cisco: ciscoLastSync.data?.added_at || null,
-          cloudflare: cloudflareLastSync.data?.added_at || null
+          cisco: ciscoLastSync,
+          cloudflare: cloudflareLastSync
         },
         coverage: {
           whitelistedToday: whitelistedToday.count || 0,

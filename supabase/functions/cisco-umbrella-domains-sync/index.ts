@@ -46,20 +46,6 @@ serve(async (req: Request) => {
     const startTime = Date.now();
 
     try {
-      // Clean expired domains
-      console.log('[CISCO-UMBRELLA-SYNC] Cleaning expired domains...');
-      try {
-        await supabaseQuery(
-          SUPABASE_URL,
-          SERVICE_KEY,
-          'rpc/clean_expired_cisco_umbrella_domains',
-          'POST',
-          {}
-        );
-      } catch (cleanError) {
-        console.error('[CISCO-UMBRELLA-SYNC] Error cleaning expired domains:', cleanError);
-      }
-
       // Download Cisco Umbrella Top 1M list (we'll use only top 100k)
       console.log('[CISCO-UMBRELLA-SYNC] Downloading Cisco Umbrella Top 1M list...');
       const ciscoUrl = 'http://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip';
@@ -119,29 +105,47 @@ serve(async (req: Request) => {
 
       console.log(`[CISCO-UMBRELLA-SYNC] Parsed ${domains.length} domains`);
 
-      // Insert domains in batches
-      let inserted = 0;
+      // Generate CSV content
+      const csvLines = ['domain,rank'];
+      domains.forEach(d => csvLines.push(`${d.domain},${d.rank}`));
+      const csvContent = csvLines.join('\n');
+      const csvBlob = new Blob([csvContent], { type: 'text/csv' });
       
-      for (let i = 0; i < domains.length; i += BATCH_SIZE) {
-        const batch = domains.slice(i, i + BATCH_SIZE);
-        
-        const insertData = batch.map(d => ({
-          domain: d.domain,
-          rank: d.rank,
-          added_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }));
+      console.log(`[CISCO-UMBRELLA-SYNC] Generated CSV: ${(csvBlob.size / 1024 / 1024).toFixed(2)} MB`);
 
-        await supabaseQuery(
-          SUPABASE_URL,
-          SERVICE_KEY,
-          'cisco_umbrella_top_domains',
-          'POST',
-          insertData
-        );
+      // Upload to Supabase Storage
+      const fileName = `cisco-umbrella-top-100k-${new Date().toISOString().split('T')[0]}.csv`;
+      
+      const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/whitelists/${fileName}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SERVICE_KEY}`,
+          'Content-Type': 'text/csv',
+          'x-upsert': 'true'
+        },
+        body: csvBlob
+      });
 
-        inserted += batch.length;
-        console.log(`[CISCO-UMBRELLA-SYNC] Inserted batch ${Math.floor(i / BATCH_SIZE) + 1}: ${inserted}/${domains.length}`);
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Storage upload failed: ${uploadResponse.status} ${errorText}`);
+      }
+
+      console.log(`[CISCO-UMBRELLA-SYNC] ✅ Uploaded to Storage: ${fileName}`);
+
+      // Create symlink "latest"
+      const latestResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/whitelists/cisco-umbrella-latest.csv`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SERVICE_KEY}`,
+          'Content-Type': 'text/csv',
+          'x-upsert': 'true'
+        },
+        body: csvBlob
+      });
+
+      if (!latestResponse.ok) {
+        console.warn('[CISCO-UMBRELLA-SYNC] Failed to update latest symlink');
       }
 
       const duration = Date.now() - startTime;
@@ -160,8 +164,9 @@ serve(async (req: Request) => {
             metadata: {
               started_at: new Date(startTime).toISOString(),
               completed_at: new Date().toISOString(),
-              domains_synced: inserted,
-              source: 'cisco_umbrella_top_1m'
+              domains_synced: domains.length,
+              source: 'cisco_umbrella_top_1m',
+              storage_file: fileName
             }
           },
           `?id=eq.${logId}`
@@ -171,7 +176,8 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          domains_synced: inserted,
+          domains_synced: domains.length,
+          storage_file: fileName,
           duration_ms: duration
         }),
         {

@@ -131,27 +131,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cisco_umbrella_top_domains: {
-        Row: {
-          added_at: string
-          domain: string
-          expires_at: string
-          rank: number | null
-        }
-        Insert: {
-          added_at?: string
-          domain: string
-          expires_at?: string
-          rank?: number | null
-        }
-        Update: {
-          added_at?: string
-          domain?: string
-          expires_at?: string
-          rank?: number | null
-        }
-        Relationships: []
-      }
       cloudflare_radar_enrichment: {
         Row: {
           asn: number | null
@@ -188,33 +167,6 @@ export type Database = {
           kind?: string
           prefix?: string | null
           raw_response?: Json | null
-        }
-        Relationships: []
-      }
-      cloudflare_radar_top_domains: {
-        Row: {
-          added_at: string
-          bucket: string
-          dataset_id: string | null
-          domain: string
-          expires_at: string
-          rank: number | null
-        }
-        Insert: {
-          added_at?: string
-          bucket?: string
-          dataset_id?: string | null
-          domain: string
-          expires_at?: string
-          rank?: number | null
-        }
-        Update: {
-          added_at?: string
-          bucket?: string
-          dataset_id?: string | null
-          domain?: string
-          expires_at?: string
-          rank?: number | null
         }
         Relationships: []
       }
@@ -1264,14 +1216,6 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_cf_radar_cache: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      clean_expired_cf_radar_domains: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      clean_expired_cisco_umbrella_domains: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
