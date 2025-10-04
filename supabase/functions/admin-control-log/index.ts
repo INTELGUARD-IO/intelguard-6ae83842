@@ -33,11 +33,12 @@ serve(async (req: Request) => {
     if (hasAuthToken && !isCronCall) {
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
-        { global: { headers: { Authorization: authHeader! } } }
+        Deno.env.get('SUPABASE_ANON_KEY')!
       );
       
-      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      // Extract JWT token from Bearer header
+      const jwt = authHeader!.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
       
       if (userError || !user) {
         console.error('Invalid user token:', userError);
