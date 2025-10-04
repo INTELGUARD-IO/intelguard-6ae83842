@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Activity, CheckCircle2, XCircle, Clock, TrendingUp, AlertCircle, Play } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, Clock, TrendingUp, AlertCircle, Play, Database } from "lucide-react";
 import { toast } from "sonner";
 
 interface ValidatorStats {
@@ -16,29 +16,28 @@ interface ValidatorStats {
 }
 
 interface ValidationJobStats {
+  totalIndicators: number;
+  validated: number;
   pending: number;
-  completed: number;
-  failed: number;
-  totalProcessed: number;
+  processedToday: number;
 }
 
 interface RecentJob {
   id: number;
   indicator: string;
   kind: string;
-  status: string;
-  scheduled_at: string;
-  updated_at: string;
-  attempts: number;
+  confidence: number;
+  last_validated: string;
+  sources: string[];
 }
 
 export default function Validators() {
   const [validators, setValidators] = useState<ValidatorStats[]>([]);
   const [jobStats, setJobStats] = useState<ValidationJobStats>({
+    totalIndicators: 0,
+    validated: 0,
     pending: 0,
-    completed: 0,
-    failed: 0,
-    totalProcessed: 0
+    processedToday: 0
   });
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,21 +276,25 @@ export default function Validators() {
 
   const loadJobStats = async () => {
     try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
       const [
+        { count: totalCount },
+        { count: validatedCount },
         { count: pendingCount },
-        { count: completedCount },
-        { count: failedCount }
+        { count: todayCount }
       ] = await Promise.all([
-        supabase.from('validation_jobs').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
-        supabase.from('validation_jobs').select('*', { count: 'exact', head: true }).eq('status', 'COMPLETED'),
-        supabase.from('validation_jobs').select('*', { count: 'exact', head: true }).eq('status', 'FAILED')
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).gte('confidence', 70),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).lt('confidence', 70),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).gte('last_validated', twentyFourHoursAgo)
       ]);
 
       setJobStats({
+        totalIndicators: totalCount || 0,
+        validated: validatedCount || 0,
         pending: pendingCount || 0,
-        completed: completedCount || 0,
-        failed: failedCount || 0,
-        totalProcessed: (completedCount || 0) + (failedCount || 0)
+        processedToday: todayCount || 0
       });
     } catch (error) {
       console.error('Error loading job stats:', error);
@@ -301,9 +304,9 @@ export default function Validators() {
   const loadRecentJobs = async () => {
     try {
       const { data } = await supabase
-        .from('validation_jobs')
-        .select('*')
-        .order('updated_at', { ascending: false })
+        .from('dynamic_raw_indicators')
+        .select('id, indicator, kind, confidence, last_validated, sources')
+        .order('last_validated', { ascending: false })
         .limit(10);
 
       setRecentJobs(data || []);
@@ -375,45 +378,45 @@ export default function Validators() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Jobs</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Indicators</CardTitle>
+            <Database className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{jobStats.totalIndicators.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">In database</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Validated</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{jobStats.validated.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Confidence ≥ 70</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Validation</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{jobStats.pending.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Waiting for processing</p>
+            <p className="text-xs text-muted-foreground">Confidence &lt; 70</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Jobs</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.completed.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Successfully processed</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed Jobs</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.failed.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Requires attention</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Processed</CardTitle>
+            <CardTitle className="text-sm font-medium">Processed Today</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{jobStats.totalProcessed.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">All-time total</p>
+            <div className="text-2xl font-bold">{jobStats.processedToday.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Last 24 hours</p>
           </CardContent>
         </Card>
       </div>
@@ -500,53 +503,50 @@ export default function Validators() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
-            Recent Validation Jobs
+            Recently Validated Indicators
           </CardTitle>
-          <CardDescription>Latest 10 validation jobs from the queue</CardDescription>
+          <CardDescription>Latest indicators processed by the validation system</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Indicator</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Attempts</TableHead>
-                <TableHead>Scheduled</TableHead>
-                <TableHead>Last Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentJobs.length === 0 ? (
+          {recentJobs.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">No recent validations found</p>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    No validation jobs found
-                  </TableCell>
+                  <TableHead>Indicator</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Confidence</TableHead>
+                  <TableHead className="text-right">Sources</TableHead>
+                  <TableHead>Last Validated</TableHead>
                 </TableRow>
-              ) : (
-                recentJobs.map((job) => (
+              </TableHeader>
+              <TableBody>
+                {recentJobs.map((job) => (
                   <TableRow key={job.id}>
-                    <TableCell className="font-mono text-xs">{job.indicator}</TableCell>
+                    <TableCell className="font-mono text-sm">{job.indicator}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{job.kind}</Badge>
                     </TableCell>
-                    <TableCell>{getStatusBadge(job.status)}</TableCell>
                     <TableCell>
-                      <Badge variant={job.attempts > 1 ? "destructive" : "outline"}>
-                        {job.attempts}
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          job.confidence >= 70 
+                            ? "bg-green-500/10 text-green-600" 
+                            : "bg-yellow-500/10 text-yellow-600"
+                        }
+                      >
+                        {job.confidence.toFixed(1)}%
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatDate(job.scheduled_at)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatDate(job.updated_at)}
-                    </TableCell>
+                    <TableCell className="text-right">{job.sources?.length || 0}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatDate(job.last_validated)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
