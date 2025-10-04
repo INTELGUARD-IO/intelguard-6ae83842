@@ -37,6 +37,10 @@ interface Stats {
   whitelistedIndicators: number;
   lastWhitelistSync: string | null;
   otxValidated: number;
+  
+  // Google Safe Browsing stats
+  safeBrowsingValidated: number;
+  safeBrowsingThreats: number;
 }
 
 export default function Dashboard() {
@@ -60,6 +64,8 @@ export default function Dashboard() {
     whitelistedIndicators: 0,
     lastWhitelistSync: null,
     otxValidated: 0,
+    safeBrowsingValidated: 0,
+    safeBrowsingThreats: 0,
   });
   const [loading, setLoading] = useState(true);
   const [syncingWhitelist, setSyncingWhitelist] = useState(false);
@@ -124,7 +130,9 @@ export default function Dashboard() {
         { count: whitelistCount },
         { data: whitelistData },
         { count: whitelistedCount },
-        { count: otxValidatedCount }
+        { count: otxValidatedCount },
+        { count: safeBrowsingValidatedCount },
+        { count: safeBrowsingThreatsCount }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -154,7 +162,11 @@ export default function Dashboard() {
         // Whitelisted indicators (confidence = 0)
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0),
         // OTX validated indicators
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('otx_checked', true)
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('otx_checked', true),
+        // Google Safe Browsing validated indicators
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('safebrowsing_checked', true),
+        // Google Safe Browsing threats detected (score >= 50)
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('safebrowsing_checked', true).gte('safebrowsing_score', 50)
       ]);
 
       // Calculate unique sources
@@ -231,6 +243,8 @@ export default function Dashboard() {
         whitelistedIndicators: whitelistedCount || 0,
         lastWhitelistSync,
         otxValidated: otxValidatedCount || 0,
+        safeBrowsingValidated: safeBrowsingValidatedCount || 0,
+        safeBrowsingThreats: safeBrowsingThreatsCount || 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -526,6 +540,44 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span className="text-xs">Scoring 0-100 | Cache 24h TTL</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Google Safe Browsing</h3>
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={async () => {
+                        try {
+                          toast.info('🔍 Running Google Safe Browsing validation...');
+                          const { error } = await supabase.functions.invoke('google-safebrowsing-validator');
+                          if (error) throw error;
+                          toast.success('✅ Safe Browsing validation completed!');
+                          await loadStats();
+                        } catch (error: any) {
+                          console.error('Safe Browsing validation error:', error);
+                          toast.error(`❌ Safe Browsing validation failed: ${error.message}`);
+                        }
+                      }}
+                    >
+                      <PlayCircle className="h-3 w-3 mr-1" />
+                      Run Check
+                    </Button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Validated</span>
+                      <span className="font-mono">{stats.safeBrowsingValidated || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Threats Detected</span>
+                      <span className="font-mono text-destructive">{stats.safeBrowsingThreats || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span className="text-xs">Batch: 200 URLs | Cache 24h TTL</span>
                     </div>
                   </div>
                 </div>

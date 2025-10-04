@@ -279,6 +279,9 @@ export type Database = {
           otx_checked: boolean
           otx_score: number | null
           otx_verdict: string | null
+          safebrowsing_checked: boolean
+          safebrowsing_score: number | null
+          safebrowsing_verdict: string | null
           source_count: number
           sources: string[]
           urlscan_checked: boolean
@@ -316,6 +319,9 @@ export type Database = {
           otx_checked?: boolean
           otx_score?: number | null
           otx_verdict?: string | null
+          safebrowsing_checked?: boolean
+          safebrowsing_score?: number | null
+          safebrowsing_verdict?: string | null
           source_count?: number
           sources: string[]
           urlscan_checked?: boolean
@@ -353,6 +359,9 @@ export type Database = {
           otx_checked?: boolean
           otx_score?: number | null
           otx_verdict?: string | null
+          safebrowsing_checked?: boolean
+          safebrowsing_score?: number | null
+          safebrowsing_verdict?: string | null
           source_count?: number
           sources?: string[]
           urlscan_checked?: boolean
@@ -456,6 +465,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      google_safebrowsing_cache: {
+        Row: {
+          checked_at: string
+          expires_at: string
+          indicator: string
+          is_threat: boolean
+          kind: string
+          platform_types: string[] | null
+          raw_response: Json | null
+          score: number
+          threat_entry_types: string[] | null
+          threat_types: string[] | null
+          verdict: string
+        }
+        Insert: {
+          checked_at?: string
+          expires_at?: string
+          indicator: string
+          is_threat?: boolean
+          kind: string
+          platform_types?: string[] | null
+          raw_response?: Json | null
+          score?: number
+          threat_entry_types?: string[] | null
+          threat_types?: string[] | null
+          verdict?: string
+        }
+        Update: {
+          checked_at?: string
+          expires_at?: string
+          indicator?: string
+          is_threat?: boolean
+          kind?: string
+          platform_types?: string[] | null
+          raw_response?: Json | null
+          score?: number
+          threat_entry_types?: string[] | null
+          threat_types?: string[] | null
+          verdict?: string
+        }
+        Relationships: []
       }
       honeydb_blacklist: {
         Row: {
@@ -1170,6 +1221,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_ripestat_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_safebrowsing_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

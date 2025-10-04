@@ -1,5 +1,8 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.google-safebrowsing-validator]
+verify_jwt = false
+
 [functions.admin-control-log]
 verify_jwt = false
 

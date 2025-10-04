@@ -41,7 +41,8 @@ const edgeFunctions: EdgeFunction[] = [
   { name: 'virustotal-validator', title: 'VirusTotal Validator', category: 'Validators', description: 'Queries VirusTotal for IPv4 and domain reputation data (4 req/min, 500/day)', icon: Shield },
   { name: 'urlscan-validator', title: 'URLScan Validator', category: 'Validators', description: 'Checks domains for malicious activity via URLScan.io API', icon: Shield },
   { name: 'censys-validator', title: 'Censys Validator', category: 'Validators', description: 'Validate IPs and domains against Censys threat intelligence database', icon: Shield },
-  { name: 'otx-validator', title: 'OTX Validator', category: 'Validators', description: 'Validate indicators against AlienVault OTX (Open Threat Exchange)', icon: Shield },
+  { name: 'otx-validator', title: 'OTX Validator', category: 'Validators', description: 'Validates indicators against AlienVault OTX threat intelligence database', icon: Shield },
+  { name: 'google-safebrowsing-validator', title: 'Google Safe Browsing', category: 'Validators', description: 'Validates IPs and domains against Google Safe Browsing threat database (batch processing, 10K queries/day)', icon: Shield },
   { name: 'cloudflare-radar-domain-validator', title: 'Cloudflare Radar Domain Validator', category: 'Validators', description: 'Validates domains against Cloudflare Radar Top 100K whitelist', icon: Shield },
   
   // Enrichment
