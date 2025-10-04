@@ -67,10 +67,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // === VALIDATOR 2: Google Safe Browsing ===
+      // === VALIDATOR 2: Google Safe Browsing (high priority for domains, weight doppio) ===
       if (indicator.safebrowsing_checked) {
         if (indicator.safebrowsing_verdict && indicator.safebrowsing_verdict !== 'clean') {
-          votes.push({ name: 'SafeBrowsing', vote: 'malicious', reason: `Verdict: ${indicator.safebrowsing_verdict}` });
+          const weight = indicator.kind === 'domain' ? 2 : 1;
+          for (let i = 0; i < weight; i++) {
+            votes.push({ name: 'SafeBrowsing', vote: 'malicious', reason: `Verdict: ${indicator.safebrowsing_verdict}` });
+          }
         } else {
           votes.push({ name: 'SafeBrowsing', vote: 'clean' });
         }
@@ -169,24 +172,27 @@ Deno.serve(async (req) => {
         }
       }
 
-      // === VALIDATOR 10: Cloudflare URL Scanner (for domains) ===
+      // === VALIDATOR 10: Cloudflare URL Scanner (for domains, weight doppio) ===
       if (indicator.cloudflare_urlscan_checked && indicator.kind === 'domain') {
         if (indicator.cloudflare_urlscan_malicious || (indicator.cloudflare_urlscan_score !== null && indicator.cloudflare_urlscan_score >= 70)) {
-          votes.push({ 
-            name: 'Cloudflare URLScan', 
-            vote: 'malicious',
-            score: indicator.cloudflare_urlscan_score,
-            reason: indicator.cloudflare_urlscan_categories?.join(', ') || 'Malicious'
-          });
+          const weight = 2; // Weight doppio per domini
+          for (let i = 0; i < weight; i++) {
+            votes.push({ 
+              name: 'Cloudflare URLScan', 
+              vote: 'malicious',
+              score: indicator.cloudflare_urlscan_score,
+              reason: indicator.cloudflare_urlscan_categories?.join(', ') || 'Malicious'
+            });
+          }
         } else {
           votes.push({ name: 'Cloudflare URLScan', vote: 'clean' });
         }
       }
 
-      // Calculate consensus
+      // Calculate consensus (threshold differenziato per tipo)
       const maliciousVotes = votes.filter(v => v.vote === 'malicious').length;
       const totalVotes = votes.length;
-      const consensusThreshold = 2; // At least 2 validators must agree
+      const consensusThreshold = indicator.kind === 'domain' ? 1 : 2; // 1 per domini, 2 per IP
 
       if (maliciousVotes >= consensusThreshold && totalVotes >= 2) {
         // PROMOTE TO VALIDATED!
@@ -194,14 +200,22 @@ Deno.serve(async (req) => {
         
         console.log(`[intelligent-validator] ✅ PROMOTED: ${indicator.indicator} (${indicator.kind}) - ${maliciousVotes}/${totalVotes} validators agree: ${validatorNames}`);
         
-        toPromote.push({
-          indicator: indicator.indicator,
-          kind: indicator.kind,
-          confidence: indicator.confidence,
-          country: indicator.country || null,
-          asn: indicator.asn || null,
-          last_validated: new Date().toISOString(),
-        });
+      // Fetch enrichment data per country/asn
+      const { data: enrichment } = await supabase
+        .from('enrichment_summary')
+        .select('country, asn, asn_name')
+        .eq('indicator', indicator.indicator)
+        .eq('kind', indicator.kind)
+        .maybeSingle();
+
+      toPromote.push({
+        indicator: indicator.indicator,
+        kind: indicator.kind,
+        confidence: indicator.confidence,
+        country: enrichment?.country || null,
+        asn: enrichment?.asn || null,
+        last_validated: new Date().toISOString(),
+      });
 
         if (indicator.kind === 'ipv4') promotedIpv4++;
         else if (indicator.kind === 'domain') promotedDomains++;

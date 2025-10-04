@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { ValidatorStatsCard } from '@/components/ValidatorStatsCard';
 import { DomainValidatorStatus } from '@/components/DomainValidatorStatus';
+import { ValidatorCoverageWidget } from '@/components/ValidatorCoverageWidget';
 
 interface Indicator {
   indicator: string;
@@ -133,9 +134,10 @@ export default function Indicators() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <ValidatorStatsCard />
         <DomainValidatorStatus />
+        <ValidatorCoverageWidget />
       </div>
 
       <Card>

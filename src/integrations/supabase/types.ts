@@ -1285,6 +1285,23 @@ export type Database = {
         }
         Relationships: []
       }
+      validator_coverage: {
+        Row: {
+          abuseipdb_checked: number | null
+          abuseipdb_pct: number | null
+          kind: string | null
+          otx_checked: number | null
+          otx_pct: number | null
+          safebrowsing_checked: number | null
+          safebrowsing_pct: number | null
+          total_indicators: number | null
+          urlscan_checked: number | null
+          urlscan_pct: number | null
+          virustotal_checked: number | null
+          virustotal_pct: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _call_edge: {
