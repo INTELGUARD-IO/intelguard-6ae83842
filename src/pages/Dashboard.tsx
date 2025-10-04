@@ -20,6 +20,11 @@ interface Stats {
   // RIPEstat enrichment stats
   enrichedCount: number;
   topCountries: Array<{ country: string; count: number }>;
+  
+  // BGPview enrichment stats
+  bgpviewEnriched: number;
+  bgpviewPtrCount: number;
+  bgpviewTopCountries: string[];
 }
 
 export default function Dashboard() {
@@ -34,6 +39,9 @@ export default function Dashboard() {
     recentDelta: null,
     enrichedCount: 0,
     topCountries: [],
+    bgpviewEnriched: 0,
+    bgpviewPtrCount: 0,
+    bgpviewTopCountries: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +60,9 @@ export default function Dashboard() {
         { count: validatedDomainCount },
         { data: deltaData },
         { count: enrichedCount },
-        { data: enrichedData }
+        { data: enrichedData },
+        { count: bgpviewCount },
+        { data: bgpviewData }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -66,7 +76,11 @@ export default function Dashboard() {
         // RIPEstat enrichment count
         supabase.from('ripestat_enrichment').select('*', { count: 'exact', head: true }),
         // RIPEstat data for country stats
-        supabase.from('ripestat_enrichment').select('country_code').gt('expires_at', new Date().toISOString())
+        supabase.from('ripestat_enrichment').select('country_code').gt('expires_at', new Date().toISOString()),
+        // BGPview enrichment count
+        supabase.from('bgpview_enrichment').select('*', { count: 'exact', head: true }),
+        // BGPview data for PTR and country stats
+        supabase.from('bgpview_enrichment').select('ptr_record, country_code').gt('expires_at', new Date().toISOString())
       ]);
 
       // Calculate unique sources
@@ -95,6 +109,19 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
+      // BGPview stats
+      const bgpviewPtrCount = bgpviewData?.filter(item => item.ptr_record).length || 0;
+      const bgpviewCountryCounts: Record<string, number> = {};
+      bgpviewData?.forEach(item => {
+        if (item.country_code) {
+          bgpviewCountryCounts[item.country_code] = (bgpviewCountryCounts[item.country_code] || 0) + 1;
+        }
+      });
+      const bgpviewTopCountries = Object.entries(bgpviewCountryCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([country]) => country);
+
       setStats({
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
@@ -106,6 +133,9 @@ export default function Dashboard() {
         recentDelta,
         enrichedCount: enrichedCount || 0,
         topCountries,
+        bgpviewEnriched: bgpviewCount || 0,
+        bgpviewPtrCount,
+        bgpviewTopCountries,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -306,39 +336,54 @@ export default function Dashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">System Status</h3>
+                  <h3 className="text-sm font-medium">Enrichment Status</h3>
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Validation System</span>
-                      <span className="text-green-600">Active</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Feed Distribution</span>
-                      <span className="text-green-600">Operational</span>
-                    </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>RIPEstat Enriched</span>
                       <span className="font-mono">{stats.enrichedCount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>BGPview Enriched</span>
+                      <span className="font-mono">{stats.bgpviewEnriched.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>PTR Records</span>
+                      <span className="font-mono">{stats.bgpviewPtrCount.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {stats.topCountries.length > 0 && (
-                <div className="space-y-2 pt-4 border-t">
-                  <h3 className="text-sm font-medium">Top Countries (by IP)</h3>
-                  <div className="space-y-1">
-                    {stats.topCountries.map(({ country, count }) => (
-                      <div key={country} className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{country}</span>
-                        </span>
-                        <span className="font-mono">{count.toLocaleString()}</span>
-                      </div>
-                    ))}
+              <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
+                {stats.topCountries.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Top Countries (RIPEstat)</h3>
+                    <div className="space-y-1">
+                      {stats.topCountries.map(({ country, count }) => (
+                        <div key={country} className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2">
+                            <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{country}</span>
+                          </span>
+                          <span className="font-mono">{count.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                
+                {stats.bgpviewTopCountries.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Top Countries (BGPview)</h3>
+                    <div className="space-y-1">
+                      {stats.bgpviewTopCountries.map((country) => (
+                        <div key={country} className="flex items-center text-sm">
+                          <span className="font-mono text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{country}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

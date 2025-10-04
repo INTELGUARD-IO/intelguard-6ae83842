@@ -473,6 +473,40 @@ export default function System() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  BGPview Enrichment
+                </CardTitle>
+                <CardDescription>
+                  Enrich indicators with rDNS, ASN, and country data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Fetches BGPview data (rDNS, ASN info, country) for IPv4 indicators.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('bgpview-enrich')}
+                  disabled={loading['bgpview-enrich']}
+                  className="w-full"
+                >
+                  {loading['bgpview-enrich'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run BGPview
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
                   Abuse.ch Validator
                 </CardTitle>

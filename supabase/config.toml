@@ -3,6 +3,9 @@ project_id = "qmsidlazqaqwcptpsjqh"
 [functions.admin-control-log]
 verify_jwt = false
 
+[functions.bgpview-enrich]
+verify_jwt = false
+
 [functions.abuse-ch-validator]
 verify_jwt = false
 

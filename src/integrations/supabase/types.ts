@@ -59,6 +59,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bgpview_enrichment: {
+        Row: {
+          asn: number | null
+          asn_description: string | null
+          asn_name: string | null
+          checked_at: string
+          cidr: number | null
+          country_code: string | null
+          expires_at: string
+          id: string
+          indicator: string
+          kind: string
+          prefix: string | null
+          ptr_record: string | null
+          raw_response: Json | null
+        }
+        Insert: {
+          asn?: number | null
+          asn_description?: string | null
+          asn_name?: string | null
+          checked_at?: string
+          cidr?: number | null
+          country_code?: string | null
+          expires_at?: string
+          id?: string
+          indicator: string
+          kind?: string
+          prefix?: string | null
+          ptr_record?: string | null
+          raw_response?: Json | null
+        }
+        Update: {
+          asn?: number | null
+          asn_description?: string | null
+          asn_name?: string | null
+          checked_at?: string
+          cidr?: number | null
+          country_code?: string | null
+          expires_at?: string
+          id?: string
+          indicator?: string
+          kind?: string
+          prefix?: string | null
+          ptr_record?: string | null
+          raw_response?: Json | null
+        }
+        Relationships: []
+      }
       censys_monthly_usage: {
         Row: {
           api_calls_count: number
@@ -968,6 +1016,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_abuseipdb_blacklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_bgpview_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
