@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, AlertCircle, CheckCircle, Clock, Database, PlayCircle, RefreshCw, XCircle, Download, Gauge, TrendingUp, AlertTriangle } from "lucide-react";
+import { Activity, AlertCircle, CheckCircle, Clock, Database, Play, PlayCircle, RefreshCw, XCircle, Download, Gauge, TrendingUp, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -179,12 +179,20 @@ const Monitoring = () => {
 
   const loadMetrics = async () => {
     try {
-      // Raw indicators count
-      const { count: rawCount } = await supabase
-        .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .is('removed_at', null);
-      setRawIndicators(rawCount || 0);
+      // Use RPC function to get raw indicators stats efficiently
+      const { data: statsData } = await supabase.rpc('get_raw_indicator_stats' as any);
+      const rawCount = statsData?.[0]?.total_count || 0;
+      setRawIndicators(Number(rawCount));
+
+      // Indicators by type from RPC
+      if (statsData?.[0]) {
+        const stats = statsData[0];
+        const typeCounts = [
+          { label: 'ipv4', value: Number(stats.ipv4_count) },
+          { label: 'domain', value: Number(stats.domain_count) }
+        ].filter(item => item.value > 0);
+        setIndicatorsByType(typeCounts);
+      }
 
       // Dynamic indicators count
       const { count: dynamicCount } = await supabase
@@ -203,26 +211,6 @@ const Monitoring = () => {
         .from('vendor_checks')
         .select('*', { count: 'exact', head: true });
       setVendorChecks(vendorCount || 0);
-
-      // Indicators by type
-      const { data: typeData } = await supabase
-        .from('raw_indicators')
-        .select('kind')
-        .is('removed_at', null);
-      
-      if (typeData) {
-        const typeCounts = typeData.reduce((acc: any, item) => {
-          acc[item.kind] = (acc[item.kind] || 0) + 1;
-          return acc;
-        }, {});
-
-        setIndicatorsByType(
-          Object.entries(typeCounts).map(([label, value]) => ({
-            label,
-            value: value as number,
-          }))
-        );
-      }
     } catch (error) {
       console.error('Error loading metrics:', error);
     }
@@ -414,6 +402,36 @@ const Monitoring = () => {
       }
     } catch (error) {
       console.error('Error loading daily deltas:', error);
+    }
+  };
+
+  const forceValidation = async () => {
+    try {
+      toast({
+        title: "Avvio validazione forzata",
+        description: "Il processo potrebbe richiedere 2-3 minuti...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('validation-orchestrator', {
+        body: { manual: true }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Validazione completata",
+        description: `Processati: ${data?.processed || 0} | Validati: ${data?.validated || 0}`,
+      });
+
+      // Ricarica i dati dopo la validazione
+      await loadAllData();
+    } catch (error: any) {
+      console.error('Error forcing validation:', error);
+      toast({
+        title: "Errore durante la validazione",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -637,6 +655,10 @@ const Monitoring = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={forceValidation} variant="outline" size="sm">
+            <Play className="h-4 w-4 mr-2" />
+            Force Validation
+          </Button>
           <Button onClick={exportMetrics} variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
