@@ -48,7 +48,8 @@ export default function Validators() {
     { name: 'VirusTotal', column: 'virustotal_checked' },
     { name: 'URLScan', column: 'urlscan_checked' },
     { name: 'NeutrinoAPI', column: 'neutrinoapi_checked' },
-    { name: 'HoneyDB', column: 'honeydb_checked' }
+    { name: 'HoneyDB', column: 'honeydb_checked' },
+    { name: 'Censys', column: 'censys_checked' }
   ];
 
   const loadValidatorStats = async () => {

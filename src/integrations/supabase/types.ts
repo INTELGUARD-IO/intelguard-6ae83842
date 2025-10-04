@@ -59,6 +59,30 @@ export type Database = {
         }
         Relationships: []
       }
+      censys_monthly_usage: {
+        Row: {
+          api_calls_count: number
+          created_at: string
+          id: string
+          month: string
+          updated_at: string
+        }
+        Insert: {
+          api_calls_count?: number
+          created_at?: string
+          id?: string
+          month: string
+          updated_at?: string
+        }
+        Update: {
+          api_calls_count?: number
+          created_at?: string
+          id?: string
+          month?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -119,6 +143,9 @@ export type Database = {
           abuseipdb_checked: boolean
           abuseipdb_in_blacklist: boolean | null
           abuseipdb_score: number | null
+          censys_checked: boolean
+          censys_malicious: boolean | null
+          censys_score: number | null
           confidence: number
           first_validated: string
           honeydb_checked: boolean
@@ -150,6 +177,9 @@ export type Database = {
           abuseipdb_checked?: boolean
           abuseipdb_in_blacklist?: boolean | null
           abuseipdb_score?: number | null
+          censys_checked?: boolean
+          censys_malicious?: boolean | null
+          censys_score?: number | null
           confidence: number
           first_validated?: string
           honeydb_checked?: boolean
@@ -181,6 +211,9 @@ export type Database = {
           abuseipdb_checked?: boolean
           abuseipdb_in_blacklist?: boolean | null
           abuseipdb_score?: number | null
+          censys_checked?: boolean
+          censys_malicious?: boolean | null
+          censys_score?: number | null
           confidence?: number
           first_validated?: string
           honeydb_checked?: boolean
@@ -901,6 +934,19 @@ export type Database = {
           schedule: string
           username: string
         }[]
+      }
+      get_current_month_censys_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          api_calls_count: number
+          id: string
+          month: string
+          remaining_calls: number
+        }[]
+      }
+      increment_censys_usage: {
+        Args: { calls_count?: number }
+        Returns: undefined
       }
       is_super_admin: {
         Args: { _user_id: string }

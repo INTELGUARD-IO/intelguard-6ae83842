@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.virustotal-validator]
 verify_jwt = false
+
+[functions.censys-validator]
+verify_jwt = false
