@@ -198,17 +198,40 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Allow either CRON secret OR valid JWT token
   const cronSecretHeader = req.headers.get('x-cron-secret');
-  if (cronSecretHeader !== cronSecret) {
-    console.error('❌ Invalid or missing CRON secret');
+  const authHeader = req.headers.get('authorization');
+
+  const isValidCronCall = cronSecretHeader === cronSecret;
+  const isAuthenticatedUser = authHeader && authHeader.startsWith('Bearer ');
+
+  if (!isValidCronCall && !isAuthenticatedUser) {
+    console.error('❌ Unauthorized: Missing CRON secret or authentication');
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
+  // If authenticated via JWT, verify user is logged in
+  if (isAuthenticatedUser && !isValidCronCall) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('❌ Invalid authentication token');
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log(`✅ Manual execution triggered by user: ${user.email}`);
+  }
+
+  const executionSource = isValidCronCall ? 'CRON' : 'Manual';
   const executionStart = Date.now();
-  console.log('🚀 Google Safe Browsing Validator started');
+  console.log(`🚀 Google Safe Browsing Validator started (source: ${executionSource})`);
 
   try {
     // Step 1: Clean expired cache
