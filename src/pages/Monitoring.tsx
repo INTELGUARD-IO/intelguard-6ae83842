@@ -133,7 +133,7 @@ const Monitoring = () => {
 
         setUserRole('super_admin');
         setSessionChecked(true);
-        loadAllData();
+        await loadAllData();
       } catch (error) {
         console.error('Error in session check:', error);
         if (isMounted) {
