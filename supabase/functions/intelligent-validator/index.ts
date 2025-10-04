@@ -169,6 +169,20 @@ Deno.serve(async (req) => {
         }
       }
 
+      // === VALIDATOR 10: Cloudflare URL Scanner (for domains) ===
+      if (indicator.cloudflare_urlscan_checked && indicator.kind === 'domain') {
+        if (indicator.cloudflare_urlscan_malicious || (indicator.cloudflare_urlscan_score !== null && indicator.cloudflare_urlscan_score >= 70)) {
+          votes.push({ 
+            name: 'Cloudflare URLScan', 
+            vote: 'malicious',
+            score: indicator.cloudflare_urlscan_score,
+            reason: indicator.cloudflare_urlscan_categories?.join(', ') || 'Malicious'
+          });
+        } else {
+          votes.push({ name: 'Cloudflare URLScan', vote: 'clean' });
+        }
+      }
+
       // Calculate consensus
       const maliciousVotes = votes.filter(v => v.vote === 'malicious').length;
       const totalVotes = votes.length;

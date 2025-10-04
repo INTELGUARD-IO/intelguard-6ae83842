@@ -99,3 +99,7 @@ verify_jwt = false
 
 [functions.otx-validator]
 verify_jwt = false
+
+[functions.cloudflare-urlscan-validator]
+verify_jwt = false
+schedule = "0 */8 * * *"

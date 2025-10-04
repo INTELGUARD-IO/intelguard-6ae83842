@@ -170,6 +170,51 @@ export type Database = {
         }
         Relationships: []
       }
+      cloudflare_urlscan_cache: {
+        Row: {
+          categories: string[] | null
+          certificates: Json | null
+          checked_at: string
+          expires_at: string
+          indicator: string
+          kind: string
+          malicious: boolean | null
+          raw_response: Json | null
+          scan_id: string | null
+          score: number | null
+          technologies: Json | null
+          verdict: string | null
+        }
+        Insert: {
+          categories?: string[] | null
+          certificates?: Json | null
+          checked_at?: string
+          expires_at?: string
+          indicator: string
+          kind?: string
+          malicious?: boolean | null
+          raw_response?: Json | null
+          scan_id?: string | null
+          score?: number | null
+          technologies?: Json | null
+          verdict?: string | null
+        }
+        Update: {
+          categories?: string[] | null
+          certificates?: Json | null
+          checked_at?: string
+          expires_at?: string
+          indicator?: string
+          kind?: string
+          malicious?: boolean | null
+          raw_response?: Json | null
+          scan_id?: string | null
+          score?: number | null
+          technologies?: Json | null
+          verdict?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -233,6 +278,11 @@ export type Database = {
           censys_checked: boolean
           censys_malicious: boolean | null
           censys_score: number | null
+          cloudflare_urlscan_categories: string[] | null
+          cloudflare_urlscan_checked: boolean | null
+          cloudflare_urlscan_malicious: boolean | null
+          cloudflare_urlscan_score: number | null
+          cloudflare_urlscan_verdict: string | null
           confidence: number
           first_validated: string
           honeydb_checked: boolean
@@ -275,6 +325,11 @@ export type Database = {
           censys_checked?: boolean
           censys_malicious?: boolean | null
           censys_score?: number | null
+          cloudflare_urlscan_categories?: string[] | null
+          cloudflare_urlscan_checked?: boolean | null
+          cloudflare_urlscan_malicious?: boolean | null
+          cloudflare_urlscan_score?: number | null
+          cloudflare_urlscan_verdict?: string | null
           confidence: number
           first_validated?: string
           honeydb_checked?: boolean
@@ -317,6 +372,11 @@ export type Database = {
           censys_checked?: boolean
           censys_malicious?: boolean | null
           censys_score?: number | null
+          cloudflare_urlscan_categories?: string[] | null
+          cloudflare_urlscan_checked?: boolean | null
+          cloudflare_urlscan_malicious?: boolean | null
+          cloudflare_urlscan_score?: number | null
+          cloudflare_urlscan_verdict?: string | null
           confidence?: number
           first_validated?: string
           honeydb_checked?: boolean
@@ -1216,6 +1276,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_cf_radar_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_cloudflare_urlscan_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
