@@ -13,6 +13,7 @@ import System from "./pages/System";
 import IngestSources from "./pages/IngestSources";
 import Monitoring from "./pages/Monitoring";
 import NetworkStatus from "./pages/NetworkStatus";
+import Validators from "./pages/Validators";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/feed-tokens" element={<FeedTokens />} />
             <Route path="/system" element={<System />} />
             <Route path="/ingest-sources" element={<IngestSources />} />
+            <Route path="/validators" element={<Validators />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/network-status" element={<NetworkStatus />} />
           </Route>
