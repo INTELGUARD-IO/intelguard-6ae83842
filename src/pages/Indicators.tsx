@@ -63,13 +63,14 @@ export default function Indicators() {
     ind.indicator.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const exportIndicators = () => {
+  const exportIPv4 = () => {
+    const ipv4Indicators = indicators.filter(ind => ind.kind === 'ipv4');
+    
     const csv = [
-      ['Indicator', 'Type', 'Confidence', 'Last Validated', 'Country', 'ASN'].join(','),
-      ...filteredIndicators.map(ind =>
+      ['IPv4 Address', 'Confidence', 'Last Validated', 'Country', 'ASN'].join(','),
+      ...ipv4Indicators.map(ind =>
         [
           ind.indicator,
-          ind.kind,
           ind.confidence,
           new Date(ind.last_validated).toISOString(),
           ind.country || '',
@@ -82,7 +83,31 @@ export default function Indicators() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `indicators-${activeTab}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `threat-ipv4-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  const exportDomains = () => {
+    const domainIndicators = indicators.filter(ind => ind.kind === 'domain');
+    
+    const csv = [
+      ['Domain', 'Confidence', 'Last Validated', 'Country', 'ASN'].join(','),
+      ...domainIndicators.map(ind =>
+        [
+          ind.indicator,
+          ind.confidence,
+          new Date(ind.last_validated).toISOString(),
+          ind.country || '',
+          ind.asn || '',
+        ].join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `threat-domains-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -95,10 +120,16 @@ export default function Indicators() {
             Validated threats from multi-validator consensus (OTX, SafeBrowsing, AbuseIPDB, NeutrinoAPI, URLScan, HoneyDB, Abuse.ch, VirusTotal, Censys)
           </p>
         </div>
-        <Button onClick={exportIndicators} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={exportIPv4} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export IPv4
+          </Button>
+          <Button onClick={exportDomains} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export Domains
+          </Button>
+        </div>
       </div>
 
       <ValidatorStatsCard />

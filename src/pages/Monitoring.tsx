@@ -13,6 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AbuseIPDBQuotaWidget } from "@/components/AbuseIPDBQuotaWidget";
 import { ValidatorConsensusWidget } from "@/components/ValidatorConsensusWidget";
+import { AllQuotasWidget } from "@/components/AllQuotasWidget";
 
 interface MetricData {
   label: string;
@@ -912,11 +913,14 @@ const Monitoring = () => {
         </Card>
       </div>
 
-      {/* AbuseIPDB Quota Widget */}
+      {/* Quota Monitoring Widgets */}
       <div className="grid gap-4 md:grid-cols-2">
-        <AbuseIPDBQuotaWidget />
         <ValidatorConsensusWidget />
+        <AbuseIPDBQuotaWidget />
       </div>
+
+      {/* All Quotas Monitor */}
+      <AllQuotasWidget />
 
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList>
