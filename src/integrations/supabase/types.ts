@@ -884,6 +884,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      count_unique_indicators: {
+        Args: { p_kind: string }
+        Returns: number
+      }
       get_cron_jobs: {
         Args: Record<PropertyKey, never>
         Returns: {

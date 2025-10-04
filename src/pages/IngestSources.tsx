@@ -99,23 +99,17 @@ export default function IngestSources() {
         .eq('kind', 'domain')
         .is('removed_at', null);
 
-      // Count unique IPv4 indicators
-      const { data: uniqueIpv4Data } = await supabase
-        .from('raw_indicators')
-        .select('indicator')
-        .eq('kind', 'ipv4')
-        .is('removed_at', null);
-      
-      const uniqueIpv4Set = new Set(uniqueIpv4Data?.map(i => i.indicator) || []);
+      // Count unique IPv4 indicators using RPC for efficiency
+      const { data: uniqueIpv4Count } = await supabase
+        .rpc('count_unique_indicators' as any, { 
+          p_kind: 'ipv4' 
+        });
 
-      // Count unique domain indicators
-      const { data: uniqueDomainsData } = await supabase
-        .from('raw_indicators')
-        .select('indicator')
-        .eq('kind', 'domain')
-        .is('removed_at', null);
-      
-      const uniqueDomainsSet = new Set(uniqueDomainsData?.map(i => i.indicator) || []);
+      // Count unique domain indicators using RPC for efficiency
+      const { data: uniqueDomainsCount } = await supabase
+        .rpc('count_unique_indicators' as any, { 
+          p_kind: 'domain' 
+        });
 
       // Count unique sources
       const { data: uniqueSources } = await supabase
@@ -130,8 +124,8 @@ export default function IngestSources() {
         ipv4: ipv4Count || 0,
         domain: domainCount || 0,
         sources: sourcesSet.size,
-        uniqueIpv4: uniqueIpv4Set.size,
-        uniqueDomains: uniqueDomainsSet.size
+        uniqueIpv4: Number(uniqueIpv4Count) || 0,
+        uniqueDomains: Number(uniqueDomainsCount) || 0
       });
     } catch (error) {
       console.error('Error loading raw indicator stats:', error);
