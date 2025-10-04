@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, ArrowRight, Database, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -40,6 +40,8 @@ export default function IngestSources() {
     ipv4: number;
     domain: number;
     sources: number;
+    uniqueIpv4: number;
+    uniqueDomains: number;
   } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -97,6 +99,24 @@ export default function IngestSources() {
         .eq('kind', 'domain')
         .is('removed_at', null);
 
+      // Count unique IPv4 indicators
+      const { data: uniqueIpv4Data } = await supabase
+        .from('raw_indicators')
+        .select('indicator')
+        .eq('kind', 'ipv4')
+        .is('removed_at', null);
+      
+      const uniqueIpv4Set = new Set(uniqueIpv4Data?.map(i => i.indicator) || []);
+
+      // Count unique domain indicators
+      const { data: uniqueDomainsData } = await supabase
+        .from('raw_indicators')
+        .select('indicator')
+        .eq('kind', 'domain')
+        .is('removed_at', null);
+      
+      const uniqueDomainsSet = new Set(uniqueDomainsData?.map(i => i.indicator) || []);
+
       // Count unique sources
       const { data: uniqueSources } = await supabase
         .from('raw_indicators')
@@ -109,7 +129,9 @@ export default function IngestSources() {
         total: totalCount || 0,
         ipv4: ipv4Count || 0,
         domain: domainCount || 0,
-        sources: sourcesSet.size
+        sources: sourcesSet.size,
+        uniqueIpv4: uniqueIpv4Set.size,
+        uniqueDomains: uniqueDomainsSet.size
       });
     } catch (error) {
       console.error('Error loading raw indicator stats:', error);
@@ -118,10 +140,12 @@ export default function IngestSources() {
 
   useEffect(() => {
     loadSources();
-    loadRawIndicatorStats();
   }, []);
 
   useEffect(() => {
+    if (!roleLoading && isSuperAdmin) {
+      loadRawIndicatorStats();
+    }
     if (!roleLoading && !isSuperAdmin) {
       navigate('/dashboard');
       toast.error('Access denied: Super admin only');
@@ -479,6 +503,90 @@ export default function IngestSources() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Data Processing Funnel */}
+      {rawIndicatorStats && (
+        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Data Processing Pipeline
+            </CardTitle>
+            <CardDescription>
+              Visual representation of indicator deduplication and processing flow
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              {/* Stage 1: Raw Indicators */}
+              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-primary/30 shadow-sm">
+                <Database className="h-8 w-8 mx-auto mb-3 text-primary" />
+                <div className="text-3xl font-bold text-primary mb-2">
+                  {rawIndicatorStats.total.toLocaleString()}
+                </div>
+                <div className="text-sm font-medium mb-1">Total Raw Indicators</div>
+                <div className="text-xs text-muted-foreground">
+                  From {rawIndicatorStats.sources} sources
+                </div>
+              </div>
+
+              <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+
+              {/* Stage 2: Unique IPv4 */}
+              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-blue-500/30 shadow-sm">
+                <CheckCircle className="h-8 w-8 mx-auto mb-3 text-blue-600" />
+                <div className="text-3xl font-bold text-blue-600 mb-2">
+                  {rawIndicatorStats.uniqueIpv4.toLocaleString()}
+                </div>
+                <div className="text-sm font-medium mb-1">Unique IPv4 Addresses</div>
+                <div className="text-xs text-muted-foreground">
+                  {rawIndicatorStats.ipv4 > 0 && (
+                    <>
+                      {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% of {rawIndicatorStats.ipv4.toLocaleString()} raw
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+
+              {/* Stage 3: Unique Domains */}
+              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-green-500/30 shadow-sm">
+                <CheckCircle className="h-8 w-8 mx-auto mb-3 text-green-600" />
+                <div className="text-3xl font-bold text-green-600 mb-2">
+                  {rawIndicatorStats.uniqueDomains.toLocaleString()}
+                </div>
+                <div className="text-sm font-medium mb-1">Unique Domains</div>
+                <div className="text-xs text-muted-foreground">
+                  {rawIndicatorStats.domain > 0 && (
+                    <>
+                      {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% of {rawIndicatorStats.domain.toLocaleString()} raw
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="mt-6 pt-6 border-t grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-sm text-muted-foreground mb-1">Total Duplicates Removed</div>
+                <div className="text-2xl font-bold text-destructive">
+                  {(rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground mb-1">Deduplication Rate</div>
+                <div className="text-2xl font-bold text-primary">
+                  {rawIndicatorStats.total > 0 
+                    ? (((rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains) / rawIndicatorStats.total) * 100).toFixed(1)
+                    : 0}%
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
