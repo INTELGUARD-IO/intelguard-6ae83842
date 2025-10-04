@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Activity, CheckCircle2, XCircle, Clock, TrendingUp, AlertCircle, Play, Database } from "lucide-react";
 import { toast } from "sonner";
+import { useUserRole } from "@/hooks/useUserRole";
+import WhitelistMetrics from "@/components/WhitelistMetrics";
+import WhitelistTimeline from "@/components/WhitelistTimeline";
 
 interface ValidatorStats {
   name: string;
@@ -32,6 +35,7 @@ interface RecentJob {
 }
 
 export default function Validators() {
+  const { isSuperAdmin, loading: roleLoading } = useUserRole();
   const [validators, setValidators] = useState<ValidatorStats[]>([]);
   const [jobStats, setJobStats] = useState<ValidationJobStats>({
     totalIndicators: 0,
@@ -359,7 +363,7 @@ export default function Validators() {
     return `${Math.floor(diffMins / 1440)}d ago`;
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Activity className="w-8 h-8 animate-spin" />
@@ -373,6 +377,12 @@ export default function Validators() {
         <h1 className="text-3xl font-bold mb-2">Validation System Status</h1>
         <p className="text-muted-foreground">Real-time monitoring of all validators and validation jobs</p>
       </div>
+
+      {/* Whitelist Metrics - Always visible */}
+      <WhitelistMetrics />
+
+      {/* Timeline Chart - Admin Only */}
+      {isSuperAdmin && <WhitelistTimeline />}
 
       {/* Job Statistics */}
       <div className="grid gap-4 md:grid-cols-4">

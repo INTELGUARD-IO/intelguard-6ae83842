@@ -1,5 +1,11 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.whitelist-cross-validator]
+verify_jwt = false
+
+[functions.whitelist-email-report]
+verify_jwt = false
+
 [functions.validation-orchestrator]
 verify_jwt = false
 

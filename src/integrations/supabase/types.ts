@@ -311,6 +311,8 @@ export type Database = {
           virustotal_checked: boolean
           virustotal_malicious: boolean | null
           virustotal_score: number | null
+          whitelist_source: string | null
+          whitelisted: boolean | null
         }
         Insert: {
           abuse_ch_checked?: boolean
@@ -351,6 +353,8 @@ export type Database = {
           virustotal_checked?: boolean
           virustotal_malicious?: boolean | null
           virustotal_score?: number | null
+          whitelist_source?: string | null
+          whitelisted?: boolean | null
         }
         Update: {
           abuse_ch_checked?: boolean
@@ -391,6 +395,8 @@ export type Database = {
           virustotal_checked?: boolean
           virustotal_malicious?: boolean | null
           virustotal_score?: number | null
+          whitelist_source?: string | null
+          whitelisted?: boolean | null
         }
         Relationships: []
       }
