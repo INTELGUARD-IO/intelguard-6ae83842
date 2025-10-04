@@ -32,9 +32,9 @@ const VALIDATOR_WEIGHTS: Record<string, number> = {
   abuse_ch: 0.7,
 };
 
-// Validators by indicator type
-const IP_VALIDATORS = ['neutrinoapi', 'safebrowsing', 'otx', 'virustotal', 'honeydb', 'abuseipdb', 'censys'];
-const DOMAIN_VALIDATORS = ['safebrowsing', 'otx', 'virustotal', 'urlscan', 'abuse_ch'];
+// Validators by indicator type (edge function names)
+const IP_VALIDATORS = ['neutrinoapi-validator', 'google-safebrowsing-validator', 'otx-validator', 'virustotal-validator', 'honeydb-validator', 'abuseipdb-validator', 'censys-validator'];
+const DOMAIN_VALIDATORS = ['google-safebrowsing-validator', 'otx-validator', 'virustotal-validator', 'urlscan-validator', 'abuse-ch-validator'];
 
 interface IndicatorToValidate {
   id: number;
@@ -170,155 +170,316 @@ Deno.serve(async (req) => {
   }
 });
 
+// Helper function to fetch validator result from cache after invocation
+async function fetchValidatorResult(
+  supabase: any,
+  validatorName: string,
+  indicator: IndicatorToValidate
+): Promise<ValidatorResult | null> {
+  try {
+    let score = 0;
+    let malicious = false;
+    let metadata: any = null;
+
+    // Map validator names to their cache tables and fetch logic
+    switch (validatorName) {
+      case 'abuseipdb-validator': {
+        const { data } = await supabase
+          .from('abuseipdb_blacklist')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .order('added_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.abuse_confidence_score || 0;
+          malicious = score >= 70;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'otx-validator': {
+        const { data } = await supabase
+          .from('otx_enrichment')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .order('refreshed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.score || 0;
+          malicious = data.verdict === 'malicious';
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'neutrinoapi-validator': {
+        const { data } = await supabase
+          .from('neutrinoapi_blocklist')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .order('added_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = 100; // In blocklist = 100
+          malicious = true;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'google-safebrowsing-validator': {
+        const { data } = await supabase
+          .from('google_safebrowsing_cache')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .order('checked_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.score || 0;
+          malicious = data.is_threat || false;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'virustotal-validator': {
+        const { data } = await supabase
+          .from('vendor_checks')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .eq('vendor', 'virustotal')
+          .order('checked_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.score || 0;
+          malicious = score >= 70;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'censys-validator': {
+        const { data } = await supabase
+          .from('vendor_checks')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .eq('vendor', 'censys')
+          .order('checked_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.score || 0;
+          malicious = score >= 70;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'urlscan-validator': {
+        const { data } = await supabase
+          .from('vendor_checks')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .eq('vendor', 'urlscan')
+          .order('checked_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.score || 0;
+          malicious = score >= 70;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'honeydb-validator': {
+        const { data } = await supabase
+          .from('honeydb_blacklist')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .order('added_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          score = data.threat_score || 100;
+          malicious = true;
+          metadata = data;
+        }
+        break;
+      }
+      
+      case 'abuse-ch-validator': {
+        const { data } = await supabase
+          .from('abuse_ch_fplist')
+          .select('*')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .order('added_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          // Abuse.ch FP list = whitelist, so NOT malicious
+          score = 0;
+          malicious = false;
+          metadata = data;
+        }
+        break;
+      }
+    }
+
+    const validatorShortName = validatorName.replace('-validator', '').replace('google-', '');
+    return {
+      name: validatorShortName,
+      checked: true,
+      score,
+      malicious,
+    };
+  } catch (error) {
+    console.error(`Error fetching result for ${validatorName}:`, error);
+    return null;
+  }
+}
+
+// Validate a single indicator using multiple validators (ACTIVE ORCHESTRATOR)
 async function validateIndicator(
   supabase: any,
   indicator: IndicatorToValidate,
   cloudflareSet: Set<string>
 ): Promise<ValidatorResult[]> {
   const results: ValidatorResult[] = [];
-  const validators = indicator.kind === 'ipv4' ? IP_VALIDATORS : DOMAIN_VALIDATORS;
-
-  for (const validatorName of validators) {
-    let checked = false;
-    let score: number | null = null;
-    let malicious: boolean | null = null;
-
-    // Query validator-specific tables
-    if (validatorName === 'abuseipdb') {
-      const { data: blacklistData } = await supabase
-        .from('abuseipdb_blacklist')
-        .select('abuse_confidence_score')
-        .eq('indicator', indicator.indicator)
-        .maybeSingle();
+  
+  // Determine which validators to use based on indicator kind
+  const validatorsToCall = indicator.kind === 'ipv4' 
+    ? IP_VALIDATORS 
+    : DOMAIN_VALIDATORS;
+  
+  console.log(`[Phase 1] Starting validation for ${indicator.indicator} (${indicator.kind})`);
+  console.log(`[Phase 1] Validators to call: ${validatorsToCall.join(', ')}`);
+  
+  // Phase 1: High-priority validators (parallel calls)
+  const highPriorityValidators = validatorsToCall.filter(v => {
+    const shortName = v.replace('-validator', '').replace('google-', '');
+    return HIGH_PRIORITY_VALIDATORS.includes(shortName);
+  });
+  
+  console.log(`[Phase 1] Calling ${highPriorityValidators.length} high-priority validators...`);
+  
+  const highPriorityPromises = highPriorityValidators.map(async (validatorName) => {
+    try {
+      console.log(`[Phase 1] Invoking ${validatorName}...`);
       
-      if (blacklistData) {
-        checked = true;
-        score = blacklistData.abuse_confidence_score;
-        malicious = (score !== null && score >= 50);
-      }
-    } else if (validatorName === 'otx') {
-      const { data: otxData } = await supabase
-        .from('otx_enrichment')
-        .select('score, verdict')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .maybeSingle();
+      // Invoke the validator edge function
+      const { data, error } = await supabase.functions.invoke(validatorName, {
+        body: { 
+          indicators: [indicator.indicator],
+          kind: indicator.kind 
+        }
+      });
       
-      if (otxData) {
-        checked = true;
-        score = otxData.score || 0;
-        malicious = (otxData.verdict === 'malicious' || (score !== null && score >= 50));
+      if (error) {
+        console.error(`[Phase 1] Error from ${validatorName}:`, error);
+        return null;
       }
-    } else if (validatorName === 'neutrinoapi') {
-      const { data: neutrinoData } = await supabase
-        .from('neutrinoapi_blocklist')
-        .select('category')
-        .eq('indicator', indicator.indicator)
-        .maybeSingle();
       
-      checked = true; // NeutrinoAPI always checks
-      if (neutrinoData) {
-        score = 100;
-        malicious = true;
-      } else {
-        score = 0;
-        malicious = false;
-      }
-    } else if (validatorName === 'safebrowsing') {
-      const { data: sbData } = await supabase
-        .from('google_safebrowsing_cache')
-        .select('score, is_threat')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .maybeSingle();
+      console.log(`[Phase 1] ${validatorName} responded successfully`);
       
-      if (sbData) {
-        checked = true;
-        score = sbData.score || 0;
-        malicious = sbData.is_threat || false;
-      }
-    } else if (validatorName === 'honeydb') {
-      const { data: honeyData } = await supabase
-        .from('honeydb_blacklist')
-        .select('threat_score')
-        .eq('indicator', indicator.indicator)
-        .maybeSingle();
+      // Wait a moment for the validator to write to cache
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      if (honeyData) {
-        checked = true;
-        score = honeyData.threat_score || 100;
-        malicious = true;
-      }
-    } else if (validatorName === 'virustotal') {
-      const { data: vtData } = await supabase
-        .from('vendor_checks')
-        .select('score, raw')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .ilike('vendor', 'virustotal')
-        .order('checked_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (vtData) {
-        checked = true;
-        score = vtData.score;
-        malicious = (score !== null && score >= 50);
-      }
-    } else if (validatorName === 'abuse_ch') {
-      const { data: abusechData } = await supabase
-        .from('abuse_ch_fplist')
-        .select('indicator')
-        .eq('indicator', indicator.indicator)
-        .maybeSingle();
-      
-      checked = true; // Abuse.ch always checks
-      if (abusechData) {
-        // In FP list = not malicious
-        score = 0;
-        malicious = false;
-      } else {
-        // Not in FP list = potentially malicious
-        score = null;
-        malicious = null;
-      }
-    } else if (validatorName === 'urlscan') {
-      const { data: urlscanData } = await supabase
-        .from('vendor_checks')
-        .select('score, raw')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .ilike('vendor', 'urlscan')
-        .order('checked_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (urlscanData) {
-        checked = true;
-        score = urlscanData.score;
-        malicious = (score !== null && score >= 50);
-      }
-    } else if (validatorName === 'censys') {
-      const { data: censysData } = await supabase
-        .from('vendor_checks')
-        .select('score, raw')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .ilike('vendor', 'censys')
-        .order('checked_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (censysData) {
-        checked = true;
-        score = censysData.score;
-        malicious = (score !== null && score >= 50);
+      // Fetch the result from cache
+      const result = await fetchValidatorResult(supabase, validatorName, indicator);
+      return result;
+    } catch (error) {
+      console.error(`[Phase 1] Exception calling ${validatorName}:`, error);
+      return null;
+    }
+  });
+  
+  const highPriorityResults = await Promise.all(highPriorityPromises);
+  const validHighPriorityResults = highPriorityResults.filter(r => r !== null) as ValidatorResult[];
+  results.push(...validHighPriorityResults);
+  
+  console.log(`[Phase 1] Completed: ${validHighPriorityResults.length}/${highPriorityValidators.length} validators responded`);
+  
+  // Calculate current confidence after Phase 1
+  const inCloudflareTopDomains = cloudflareSet.has(indicator.indicator.toLowerCase());
+  const phase1Confidence = calculateConfidence(results, indicator.kind, inCloudflareTopDomains);
+  console.log(`[Phase 1] Current confidence: ${phase1Confidence.confidence.toFixed(2)}, agreement: ${phase1Confidence.agreementCount}`);
+  
+  // Add delay between phases to respect rate limits
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Phase 2: Low-priority validators (only if Phase 1 confidence < threshold)
+  if (phase1Confidence.confidence < PHASE2_CONFIDENCE_THRESHOLD) {
+    const lowPriorityValidators = validatorsToCall.filter(v => {
+      const shortName = v.replace('-validator', '').replace('google-', '');
+      return LOW_PRIORITY_VALIDATORS.includes(shortName);
+    });
+    
+    console.log(`[Phase 2] Confidence below ${PHASE2_CONFIDENCE_THRESHOLD}, calling ${lowPriorityValidators.length} low-priority validators...`);
+    
+    // Sequential calls to respect strict rate limits
+    for (const validatorName of lowPriorityValidators) {
+      try {
+        console.log(`[Phase 2] Invoking ${validatorName}...`);
+        
+        const { data, error } = await supabase.functions.invoke(validatorName, {
+          body: { 
+            indicators: [indicator.indicator],
+            kind: indicator.kind 
+          }
+        });
+        
+        if (error) {
+          console.error(`[Phase 2] Error from ${validatorName}:`, error);
+        } else {
+          console.log(`[Phase 2] ${validatorName} responded successfully`);
+          
+          // Wait for validator to write to cache
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          const result = await fetchValidatorResult(supabase, validatorName, indicator);
+          if (result) {
+            results.push(result);
+          }
+        }
+        
+        // Rate limiting delay between sequential calls
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } catch (error) {
+        console.error(`[Phase 2] Exception calling ${validatorName}:`, error);
       }
     }
-
-    results.push({ name: validatorName, checked, score, malicious });
+    
+    const phase2Confidence = calculateConfidence(results, indicator.kind, inCloudflareTopDomains);
+    console.log(`[Phase 2] Final confidence: ${phase2Confidence.confidence.toFixed(2)}, agreement: ${phase2Confidence.agreementCount}`);
+  } else {
+    console.log(`[Phase 2] Skipped: Phase 1 confidence ${phase1Confidence.confidence.toFixed(2)} >= ${PHASE2_CONFIDENCE_THRESHOLD}`);
   }
-
+  
+  console.log(`[Validation Complete] ${indicator.indicator}: ${results.length} validators checked`);
+  
   return results;
 }
 
