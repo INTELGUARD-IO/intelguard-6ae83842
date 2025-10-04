@@ -56,7 +56,8 @@ export default function Validators() {
     { name: 'HoneyDB', column: 'honeydb_checked' },
     { name: 'Censys', column: 'censys_checked' },
     { name: 'OTX', column: 'otx_checked' },
-    { name: 'Google Safe Browsing', column: 'safebrowsing_checked' }
+    { name: 'Google Safe Browsing', column: 'safebrowsing_checked' },
+    { name: 'Cloudflare URLScan', column: 'cloudflare_urlscan_checked' }
   ];
 
   const triggerValidator = async (functionName: string, displayName: string) => {
@@ -271,6 +272,26 @@ export default function Validators() {
         lastCheck: safebrowsingData.data?.[0]?.checked_at || null
       });
 
+      // Cloudflare URLScan
+      const cloudflareUrlscanData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('cloudflare_urlscan_score, last_validated')
+        .eq('cloudflare_urlscan_checked', true);
+
+      const cloudflareUrlscanRecentCount = await supabase
+        .from('cloudflare_urlscan_cache')
+        .select('*', { count: 'exact', head: true })
+        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'Cloudflare URLScan',
+        totalChecks: cloudflareUrlscanData.data?.length || 0,
+        recentChecks: cloudflareUrlscanRecentCount.count || 0,
+        avgScore: cloudflareUrlscanData.data?.length ?
+          cloudflareUrlscanData.data.reduce((sum, r) => sum + (r.cloudflare_urlscan_score || 0), 0) / cloudflareUrlscanData.data.length : 0,
+        lastCheck: cloudflareUrlscanData.data?.[0]?.last_validated || null
+      });
+
       setValidators(stats);
     } catch (error) {
       console.error('Error loading validator stats:', error);
@@ -457,6 +478,24 @@ export default function Validators() {
             >
               <Play className="h-4 w-4 mr-2" />
               {triggerLoading['cloudflare-radar-enrich'] ? 'Starting...' : 'Run Cloudflare Radar'}
+            </Button>
+            <Button
+              onClick={() => triggerValidator('google-safebrowsing-validator', 'Google Safe Browsing')}
+              disabled={triggerLoading['google-safebrowsing-validator']}
+              variant="outline"
+              className="bg-blue-500/10 hover:bg-blue-500/20"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {triggerLoading['google-safebrowsing-validator'] ? 'Scanning...' : '🔍 Test SafeBrowsing (Domains)'}
+            </Button>
+            <Button
+              onClick={() => triggerValidator('cloudflare-urlscan-validator', 'Cloudflare URL Scanner')}
+              disabled={triggerLoading['cloudflare-urlscan-validator']}
+              variant="outline"
+              className="bg-orange-500/10 hover:bg-orange-500/20"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {triggerLoading['cloudflare-urlscan-validator'] ? 'Scanning...' : '🔬 Test URLScan (Domains)'}
             </Button>
           </div>
         </CardContent>
