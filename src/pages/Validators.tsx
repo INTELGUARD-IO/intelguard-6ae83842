@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Activity, CheckCircle2, XCircle, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, Clock, TrendingUp, AlertCircle, Play } from "lucide-react";
 import { toast } from "sonner";
 
 interface ValidatorStats {
@@ -41,6 +42,7 @@ export default function Validators() {
   });
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [triggerLoading, setTriggerLoading] = useState<Record<string, boolean>>({});
 
   const validatorList = [
     { name: 'AbuseIPDB', column: 'abuseipdb_checked' },
@@ -53,6 +55,31 @@ export default function Validators() {
     { name: 'OTX', column: 'otx_checked' },
     { name: 'Google Safe Browsing', column: 'safebrowsing_checked' }
   ];
+
+  const triggerValidator = async (functionName: string, displayName: string) => {
+    setTriggerLoading(prev => ({ ...prev, [functionName]: true }));
+    
+    try {
+      const { error } = await supabase.functions.invoke(functionName, {
+        body: { triggered_by: 'manual_ui', timestamp: new Date().toISOString() }
+      });
+
+      if (error) throw error;
+
+      toast.success(`${displayName} started successfully`);
+      
+      // Refresh stats after a short delay
+      setTimeout(() => {
+        loadValidatorStats();
+        loadJobStats();
+      }, 2000);
+    } catch (error: any) {
+      console.error(`Error triggering ${functionName}:`, error);
+      toast.error(`Failed to start ${displayName}: ${error.message || 'Unknown error'}`);
+    } finally {
+      setTriggerLoading(prev => ({ ...prev, [functionName]: false }));
+    }
+  };
 
   const loadValidatorStats = async () => {
     try {
@@ -390,6 +417,37 @@ export default function Validators() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Manual Triggers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Play className="h-5 w-5" />
+            Manual Validator Triggers
+          </CardTitle>
+          <CardDescription>Manually trigger validators to process indicators immediately</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => triggerValidator('otx-validator', 'OTX Validator')}
+              disabled={triggerLoading['otx-validator']}
+              variant="outline"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {triggerLoading['otx-validator'] ? 'Starting...' : 'Run OTX Validator'}
+            </Button>
+            <Button
+              onClick={() => triggerValidator('cloudflare-radar-enrich', 'Cloudflare Radar Enrich')}
+              disabled={triggerLoading['cloudflare-radar-enrich']}
+              variant="outline"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {triggerLoading['cloudflare-radar-enrich'] ? 'Starting...' : 'Run Cloudflare Radar'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Validator Status */}
       <Card>

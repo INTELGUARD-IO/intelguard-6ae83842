@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Activity, TrendingUp, CheckCircle2, AlertCircle, Clock, Play } from "lucide-react";
+import { Activity, TrendingUp, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface NetworkActivity {
@@ -32,33 +31,6 @@ export default function NetworkStatus() {
     successRate: 0
   });
   const { toast } = useToast();
-  const [loading, setLoading] = useState<Record<string, boolean>>({});
-
-  const triggerValidator = async (functionName: string, displayName: string) => {
-    setLoading(prev => ({ ...prev, [functionName]: true }));
-    
-    try {
-      const { error } = await supabase.functions.invoke(functionName, {
-        body: { triggered_by: 'manual_ui', timestamp: new Date().toISOString() }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Validator Triggered",
-        description: `${displayName} started successfully`,
-      });
-    } catch (error) {
-      console.error(`Error triggering ${functionName}:`, error);
-      toast({
-        title: "Error",
-        description: `Failed to start ${displayName}: ${error.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, [functionName]: false }));
-    }
-  };
 
   const fetchData = async () => {
     // Fetch active connections
@@ -174,36 +146,6 @@ export default function NetworkStatus() {
           <Clock className="h-3 w-3 mr-1" /> Live Updates
         </Badge>
       </div>
-
-      {/* Manual Triggers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Play className="h-5 w-5" />
-            Manual Validator Triggers
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => triggerValidator('otx-validator', 'OTX Validator')}
-              disabled={loading['otx-validator']}
-              variant="outline"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              {loading['otx-validator'] ? 'Starting...' : 'Run OTX Validator'}
-            </Button>
-            <Button
-              onClick={() => triggerValidator('cloudflare-radar-enrich', 'Cloudflare Radar Enrich')}
-              disabled={loading['cloudflare-radar-enrich']}
-              variant="outline"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              {loading['cloudflare-radar-enrich'] ? 'Starting...' : 'Run Cloudflare Radar'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
