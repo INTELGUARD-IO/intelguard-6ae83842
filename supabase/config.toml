@@ -3,6 +3,12 @@ project_id = "qmsidlazqaqwcptpsjqh"
 [functions.admin-control-log]
 verify_jwt = false
 
+[functions.cloudflare-radar-domains-sync]
+verify_jwt = false
+
+[functions.cloudflare-radar-domain-validator]
+verify_jwt = false
+
 [functions.bgpview-enrich]
 verify_jwt = false
 

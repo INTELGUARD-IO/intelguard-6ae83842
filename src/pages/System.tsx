@@ -838,6 +838,108 @@ export default function System() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  Cloudflare Radar Enrichment
+                </CardTitle>
+                <CardDescription>
+                  Enrich IPs with Cloudflare Radar BGP & geo data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Fetches ASN, country, and prefix data from Cloudflare Radar for IPv4 indicators.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('cloudflare-radar-enrich')}
+                  disabled={loading['cloudflare-radar-enrich']}
+                  className="w-full"
+                >
+                  {loading['cloudflare-radar-enrich'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Cloudflare Radar
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Cloudflare Radar Top 100K Sync
+                </CardTitle>
+                <CardDescription>
+                  Sync Top 100K domains whitelist from Cloudflare Radar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Downloads and caches the Cloudflare Radar Top 100K domains for domain validation (7-day TTL).
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('cloudflare-radar-domains-sync')}
+                  disabled={loading['cloudflare-radar-domains-sync']}
+                  className="w-full"
+                >
+                  {loading['cloudflare-radar-domains-sync'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Sync Top 100K Domains
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Cloudflare Radar Domain Validator
+                </CardTitle>
+                <CardDescription>
+                  Validate domains against Top 100K whitelist
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Validates domains in dynamic_raw_indicators against the Cloudflare Radar Top 100K whitelist, setting confidence to 0 for whitelisted domains.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('cloudflare-radar-domain-validator')}
+                  disabled={loading['cloudflare-radar-domain-validator']}
+                  className="w-full"
+                >
+                  {loading['cloudflare-radar-domain-validator'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Domain Validation
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5" />
                   Admin Control Log Email
                 </CardTitle>

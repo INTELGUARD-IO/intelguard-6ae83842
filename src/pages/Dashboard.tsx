@@ -29,6 +29,11 @@ interface Stats {
   // Cloudflare Radar enrichment stats
   cfRadarEnriched: number;
   cfRadarTopCountries: string[];
+  
+  // Cloudflare Radar whitelist stats
+  whitelistDomains: number;
+  whitelistedIndicators: number;
+  lastWhitelistSync: string | null;
 }
 
 export default function Dashboard() {
@@ -48,6 +53,9 @@ export default function Dashboard() {
     bgpviewTopCountries: [],
     cfRadarEnriched: 0,
     cfRadarTopCountries: [],
+    whitelistDomains: 0,
+    whitelistedIndicators: 0,
+    lastWhitelistSync: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +78,10 @@ export default function Dashboard() {
         { count: bgpviewCount },
         { data: bgpviewData },
         { count: cfRadarCount },
-        { data: cfRadarData }
+        { data: cfRadarData },
+        { count: whitelistCount },
+        { data: whitelistData },
+        { count: whitelistedCount }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -92,7 +103,13 @@ export default function Dashboard() {
         // Cloudflare Radar enrichment count
         supabase.from('cloudflare_radar_enrichment').select('*', { count: 'exact', head: true }),
         // Cloudflare Radar data for country stats
-        supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString())
+        supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString()),
+        // Cloudflare Radar whitelist domains count
+        supabase.from('cloudflare_radar_top_domains').select('*', { count: 'exact', head: true }).gt('expires_at', new Date().toISOString()),
+        // Cloudflare Radar whitelist domains with last sync
+        supabase.from('cloudflare_radar_top_domains').select('added_at').gt('expires_at', new Date().toISOString()).order('added_at', { ascending: false }).limit(1),
+        // Whitelisted indicators (confidence = 0)
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0)
       ]);
 
       // Calculate unique sources
@@ -146,6 +163,9 @@ export default function Dashboard() {
         .slice(0, 5)
         .map(([country]) => country);
 
+      // Whitelist stats
+      const lastWhitelistSync = whitelistData && whitelistData.length > 0 ? whitelistData[0].added_at : null;
+
       setStats({
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
@@ -162,6 +182,9 @@ export default function Dashboard() {
         bgpviewTopCountries,
         cfRadarEnriched: cfRadarCount || 0,
         cfRadarTopCountries,
+        whitelistDomains: whitelistCount || 0,
+        whitelistedIndicators: whitelistedCount || 0,
+        lastWhitelistSync,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -379,6 +402,28 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <span>PTR Records</span>
                       <span className="font-mono">{stats.bgpviewPtrCount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">Cloudflare Radar Whitelist</h3>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Top 100K Cached</span>
+                      <span className="font-mono">{stats.whitelistDomains.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Whitelisted Domains</span>
+                      <span className="font-mono">{stats.whitelistedIndicators.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Last Sync</span>
+                      <span className="font-mono text-xs">
+                        {stats.lastWhitelistSync 
+                          ? new Date(stats.lastWhitelistSync).toLocaleDateString()
+                          : 'Never'}
+                      </span>
                     </div>
                   </div>
                 </div>
