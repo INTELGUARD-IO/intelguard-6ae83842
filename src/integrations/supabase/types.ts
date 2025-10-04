@@ -1259,6 +1259,17 @@ export type Database = {
           remaining_calls: number
         }[]
       }
+      get_raw_indicator_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          domain_count: number
+          ipv4_count: number
+          total_count: number
+          unique_domain_count: number
+          unique_ipv4_count: number
+          unique_sources_count: number
+        }[]
+      }
       increment_censys_usage: {
         Args: { calls_count?: number }
         Returns: undefined

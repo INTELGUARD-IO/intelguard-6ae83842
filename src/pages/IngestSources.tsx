@@ -79,53 +79,21 @@ export default function IngestSources() {
 
   async function loadRawIndicatorStats() {
     try {
-      // Count total active raw indicators
-      const { count: totalCount } = await supabase
-        .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .is('removed_at', null);
+      // Use optimized RPC function to get all stats in a single query
+      const { data, error } = await supabase
+        .rpc('get_raw_indicator_stats' as any);
 
-      // Count IPv4 indicators
-      const { count: ipv4Count } = await supabase
-        .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'ipv4')
-        .is('removed_at', null);
+      if (error) throw error;
 
-      // Count domain indicators
-      const { count: domainCount } = await supabase
-        .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .is('removed_at', null);
-
-      // Count unique IPv4 indicators using RPC for efficiency
-      const { data: uniqueIpv4Count } = await supabase
-        .rpc('count_unique_indicators' as any, { 
-          p_kind: 'ipv4' 
-        });
-
-      // Count unique domain indicators using RPC for efficiency
-      const { data: uniqueDomainsCount } = await supabase
-        .rpc('count_unique_indicators' as any, { 
-          p_kind: 'domain' 
-        });
-
-      // Count unique sources
-      const { data: uniqueSources } = await supabase
-        .from('raw_indicators')
-        .select('source')
-        .is('removed_at', null);
-
-      const sourcesSet = new Set(uniqueSources?.map(s => s.source) || []);
-
+      const stats = data?.[0];
+      
       setRawIndicatorStats({
-        total: totalCount || 0,
-        ipv4: ipv4Count || 0,
-        domain: domainCount || 0,
-        sources: sourcesSet.size,
-        uniqueIpv4: Number(uniqueIpv4Count) || 0,
-        uniqueDomains: Number(uniqueDomainsCount) || 0
+        total: Number(stats?.total_count) || 0,
+        ipv4: Number(stats?.ipv4_count) || 0,
+        domain: Number(stats?.domain_count) || 0,
+        sources: Number(stats?.unique_sources_count) || 0,
+        uniqueIpv4: Number(stats?.unique_ipv4_count) || 0,
+        uniqueDomains: Number(stats?.unique_domain_count) || 0
       });
     } catch (error) {
       console.error('Error loading raw indicator stats:', error);
