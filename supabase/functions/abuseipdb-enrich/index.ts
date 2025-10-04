@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[abuseipdb-enrich] Starting enrichment run...');
+    console.log('[abuseipdb-enrich] 🚀 Starting intelligent enrichment run...');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     const remainingQuota = 1000 - (todayCount || 0);
 
     if (remainingQuota <= 0) {
-      console.log('[abuseipdb-enrich] Daily quota exhausted (1000/day)');
+      console.log('[abuseipdb-enrich] ❌ Daily quota exhausted (1000/day)');
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -64,15 +64,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[abuseipdb-enrich] Remaining quota: ${remainingQuota}/1000`);
+    // Auto-pause if quota too low (smart fallback)
+    if (remainingQuota < 50) {
+      console.log(`[abuseipdb-enrich] ⏸️ Low quota (${remainingQuota} remaining), pausing until tomorrow`);
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          paused: true,
+          message: 'Low API quota, pausing until tomorrow',
+          quota_used: todayCount || 0,
+          quota_remaining: remainingQuota
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Fetch top indicators to enrich (prioritize by confidence and source count)
-    const BATCH_SIZE = Math.min(100, remainingQuota); // Process up to 100 at a time
+    console.log(`[abuseipdb-enrich] 📊 Remaining quota: ${remainingQuota}/1000`);
+
+    // Fetch high-confidence indicators to enrich (smart prioritization)
+    const BATCH_SIZE = Math.min(100, remainingQuota); 
     
+    console.log('[abuseipdb-enrich] 🎯 Fetching high-confidence indicators (>= 70% confidence, 2+ sources)...');
     const { data: indicatorsToEnrich, error: fetchError } = await supabase
       .from('dynamic_raw_indicators')
       .select('indicator, kind, confidence, source_count')
       .eq('kind', 'ipv4')
+      .gte('confidence', 70)  // High-confidence only
+      .gte('source_count', 2)  // Multi-source indicators
       .order('confidence', { ascending: false })
       .order('source_count', { ascending: false })
       .limit(BATCH_SIZE);
@@ -82,25 +100,26 @@ Deno.serve(async (req) => {
     }
 
     if (!indicatorsToEnrich || indicatorsToEnrich.length === 0) {
-      console.log('[abuseipdb-enrich] No indicators to enrich');
+      console.log('[abuseipdb-enrich] ✅ No high-confidence indicators to enrich');
       return new Response(
         JSON.stringify({ 
           success: true, 
           enriched: 0,
-          message: 'No indicators to enrich'
+          message: 'No high-confidence indicators to enrich'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[abuseipdb-enrich] Enriching ${indicatorsToEnrich.length} indicators...`);
+    console.log(`[abuseipdb-enrich] 📋 Found ${indicatorsToEnrich.length} indicators to process`);
 
     let enriched = 0;
+    let skipped = 0;
     let errors = 0;
 
     for (const indicator of indicatorsToEnrich) {
       try {
-        // Check if already enriched recently (within 7 days)
+        // Check if already enriched recently (within 7 days) - avoid duplicate work
         const { data: existingCheck } = await supabase
           .from('vendor_checks')
           .select('checked_at')
@@ -110,7 +129,8 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (existingCheck) {
-          console.log(`[abuseipdb-enrich] Skipping ${indicator.indicator} (recently checked)`);
+          console.log(`[abuseipdb-enrich] ⏭️ Skipping ${indicator.indicator} (recently checked)`);
+          skipped++;
           continue;
         }
 
@@ -126,7 +146,7 @@ Deno.serve(async (req) => {
         });
 
         if (!checkResponse.ok) {
-          console.error(`[abuseipdb-enrich] API error for ${indicator.indicator}: ${checkResponse.status}`);
+          console.error(`[abuseipdb-enrich] ❌ API error for ${indicator.indicator}: ${checkResponse.status}`);
           errors++;
           continue;
         }
@@ -142,20 +162,16 @@ Deno.serve(async (req) => {
             kind: indicator.kind,
             vendor: 'abuseipdb',
             score: ipData.abuseConfidenceScore,
-            country: ipData.countryName,
-            isp: ipData.isp,
-            usage_type: ipData.usageType,
-            asn: ipData.domain || null,
             raw: ipData,
             checked_at: new Date().toISOString(),
           }, { onConflict: 'indicator,vendor' });
 
         if (insertError) {
-          console.error(`[abuseipdb-enrich] Error storing data for ${indicator.indicator}:`, insertError);
+          console.error(`[abuseipdb-enrich] ❌ Error storing data for ${indicator.indicator}:`, insertError);
           errors++;
         } else {
           enriched++;
-          console.log(`[abuseipdb-enrich] Enriched ${indicator.indicator}: score=${ipData.abuseConfidenceScore}, country=${ipData.countryName}, isp=${ipData.isp}`);
+          console.log(`[abuseipdb-enrich] ✅ Enriched ${indicator.indicator}: score=${ipData.abuseConfidenceScore}, country=${ipData.countryName}, isp=${ipData.isp}`);
         }
 
         // Rate limiting: 1 request per second to be safe
@@ -163,22 +179,23 @@ Deno.serve(async (req) => {
 
         // Check quota
         if (enriched >= remainingQuota) {
-          console.log('[abuseipdb-enrich] Quota limit reached');
+          console.log('[abuseipdb-enrich] 🛑 Quota limit reached for this run');
           break;
         }
 
       } catch (error) {
-        console.error(`[abuseipdb-enrich] Error enriching ${indicator.indicator}:`, error);
+        console.error(`[abuseipdb-enrich] ❌ Error enriching ${indicator.indicator}:`, error);
         errors++;
       }
     }
 
-    console.log(`[abuseipdb-enrich] Enrichment complete: ${enriched} enriched, ${errors} errors`);
+    console.log(`[abuseipdb-enrich] 🎉 Enrichment complete: ${enriched} enriched, ${skipped} skipped, ${errors} errors`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         enriched,
+        skipped,
         errors,
         quota_used: (todayCount || 0) + enriched,
         quota_limit: 1000,
@@ -188,7 +205,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('[abuseipdb-enrich] Error:', error);
+    console.error('[abuseipdb-enrich] ❌ Critical error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, AlertCircle, CheckCircle, Clock, Database, Play, PlayCircle, RefreshCw, XCircle, Download, Gauge, TrendingUp, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { AbuseIPDBQuotaWidget } from "@/components/AbuseIPDBQuotaWidget";
 
 interface MetricData {
   label: string;
@@ -877,6 +878,9 @@ const Monitoring = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* AbuseIPDB Quota Widget */}
+      <AbuseIPDBQuotaWidget />
 
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList>
