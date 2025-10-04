@@ -2,20 +2,31 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Globe, Activity, TrendingUp } from 'lucide-react';
+import { Shield, Globe, Activity, TrendingUp, Database, Layers, Filter } from 'lucide-react';
 
 interface Stats {
-  totalIndicators: number;
-  ipv4Count: number;
-  domainCount: number;
+  // Raw indicators (from raw_indicators table)
+  rawTotal: number;
+  rawIpv4: number;
+  rawDomains: number;
+  rawSources: number;
+  
+  // Validated indicators (from dynamic_raw_indicators table)
+  validatedTotal: number;
+  validatedIpv4: number;
+  validatedDomains: number;
   recentDelta: { added: number; removed: number } | null;
 }
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({
-    totalIndicators: 0,
-    ipv4Count: 0,
-    domainCount: 0,
+    rawTotal: 0,
+    rawIpv4: 0,
+    rawDomains: 0,
+    rawSources: 0,
+    validatedTotal: 0,
+    validatedIpv4: 0,
+    validatedDomains: 0,
     recentDelta: null,
   });
   const [loading, setLoading] = useState(true);
@@ -26,27 +37,30 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      // Get total validated indicators by kind from dynamic_raw_indicators
-      const { data: ipv4Data, count: ipv4Count } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('indicator', { count: 'exact', head: true })
-        .eq('kind', 'ipv4');
+      // Parallel queries for raw and validated indicators
+      const [
+        { count: rawIpv4Count },
+        { count: rawDomainCount },
+        { data: sourcesData },
+        { count: validatedIpv4Count },
+        { count: validatedDomainCount },
+        { data: deltaData }
+      ] = await Promise.all([
+        // Raw indicators from raw_indicators
+        supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
+        supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').is('removed_at', null),
+        supabase.from('raw_indicators').select('source').is('removed_at', null),
+        // Validated indicators from dynamic_raw_indicators
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
+        // Daily deltas
+        supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2)
+      ]);
 
-      const { data: domainData, count: domainCount } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('indicator', { count: 'exact', head: true })
-        .eq('kind', 'domain');
+      // Calculate unique sources
+      const uniqueSources = new Set(sourcesData?.map(d => d.source) || []).size;
 
-      // Get most recent daily delta
-      const { data: deltaData } = await supabase
-        .from('daily_deltas')
-        .select('*')
-        .order('run_date', { ascending: false })
-        .limit(2);
-
-      const totalIpv4 = ipv4Count || 0;
-      const totalDomain = domainCount || 0;
-
+      // Calculate recent delta
       let recentDelta = null;
       if (deltaData && deltaData.length > 0) {
         const ipv4Delta = deltaData.find(d => d.kind === 'ipv4');
@@ -58,9 +72,13 @@ export default function Dashboard() {
       }
 
       setStats({
-        totalIndicators: totalIpv4 + totalDomain,
-        ipv4Count: totalIpv4,
-        domainCount: totalDomain,
+        rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
+        rawIpv4: rawIpv4Count || 0,
+        rawDomains: rawDomainCount || 0,
+        rawSources: uniqueSources,
+        validatedTotal: (validatedIpv4Count || 0) + (validatedDomainCount || 0),
+        validatedIpv4: validatedIpv4Count || 0,
+        validatedDomains: validatedDomainCount || 0,
         recentDelta,
       });
     } catch (error) {
@@ -69,6 +87,26 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  const SectionHeader = ({ 
+    title, 
+    badge, 
+    icon: Icon 
+  }: { 
+    title: string; 
+    badge: string; 
+    icon: any;
+  }) => (
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-primary" />
+        <h2 className="text-2xl font-bold">{title}</h2>
+      </div>
+      <span className="px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full">
+        {badge}
+      </span>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -87,60 +125,122 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Indicators</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalIndicators.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Validated threats</p>
-          </CardContent>
-        </Card>
+      {/* Raw Indicators Pipeline Section */}
+      <div className="space-y-4">
+        <SectionHeader 
+          title="Raw Indicators Pipeline" 
+          badge="Unprocessed Data" 
+          icon={Database}
+        />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Raw</CardTitle>
+              <Database className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.rawTotal.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">All collected indicators</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">IPv4 Addresses</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.ipv4Count.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Malicious IPs tracked</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Raw IPv4</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.rawIpv4.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">IP addresses collected</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Domains</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.domainCount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Malicious domains tracked</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Raw Domains</CardTitle>
+              <Globe className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.rawDomains.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Domains collected</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Daily Change</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {stats.recentDelta ? (
-              <>
-                <div className="text-2xl font-bold">
-                  <span className="text-green-600">+{stats.recentDelta.added}</span>
-                  {' / '}
-                  <span className="text-red-600">-{stats.recentDelta.removed}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Added / Removed today</p>
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground">No data yet</div>
-            )}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sources</CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.rawSources}</div>
+              <p className="text-xs text-muted-foreground">Active data sources</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Validated Indicators Section */}
+      <div className="space-y-4">
+        <SectionHeader 
+          title="Validated Indicators" 
+          badge="Validated & Active" 
+          icon={Shield}
+        />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Validated</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.validatedTotal.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Validated threats</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Validated IPv4</CardTitle>
+              <Filter className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.validatedIpv4.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Malicious IPs validated</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Validated Domains</CardTitle>
+              <Globe className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.validatedDomains.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Malicious domains validated</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Daily Change</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {stats.recentDelta ? (
+                <>
+                  <div className="text-2xl font-bold">
+                    <span className="text-green-600">+{stats.recentDelta.added}</span>
+                    {' / '}
+                    <span className="text-red-600">-{stats.recentDelta.removed}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Added / Removed today</p>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">No data yet</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
@@ -160,15 +260,21 @@ export default function Dashboard() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Coverage</h3>
+                  <h3 className="text-sm font-medium">Validated Coverage</h3>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span>IPv4 Addresses</span>
-                      <span className="font-mono">{stats.ipv4Count}</span>
+                      <span className="font-mono">{stats.validatedIpv4.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>Domains</span>
-                      <span className="font-mono">{stats.domainCount}</span>
+                      <span className="font-mono">{stats.validatedDomains.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Validation Rate</span>
+                      <span className="font-mono">
+                        {stats.rawTotal > 0 ? ((stats.validatedTotal / stats.rawTotal) * 100).toFixed(2) : '0.00'}%
+                      </span>
                     </div>
                   </div>
                 </div>
