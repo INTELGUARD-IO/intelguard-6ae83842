@@ -122,8 +122,18 @@ export default function System() {
         setProgressInterval(interval);
       }
       
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session');
+      }
+
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: {},
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
 
       if (error) throw error;
