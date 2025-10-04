@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       'dynamic_raw_indicators',
       'GET',
       undefined,
-      '?select=indicator,kind&kind=eq.ipv4&removed_at=is.null&neutrinoapi_checked=eq.false&limit=100'
+      '?select=indicator,kind&kind=eq.ipv4&neutrinoapi_checked=eq.false&whitelisted=eq.false&limit=1000'
     );
 
     if (!indicators || indicators.length === 0) {

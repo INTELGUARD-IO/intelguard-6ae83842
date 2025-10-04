@@ -78,12 +78,15 @@ verify_jwt = false
 
 [functions.urlscan-validator]
 verify_jwt = false
+schedule = "0 */4 * * *"
 
 [functions.honeydb-validator]
 verify_jwt = false
+schedule = "0 */12 * * *"
 
 [functions.neutrinoapi-validator]
 verify_jwt = false
+schedule = "0 */6 * * *"
 
 [functions.virustotal-validator]
 verify_jwt = false
