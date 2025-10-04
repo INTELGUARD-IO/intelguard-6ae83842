@@ -35,6 +35,12 @@ export default function IngestSources() {
   const navigate = useNavigate();
   const [sources, setSources] = useState<IngestSource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rawIndicatorStats, setRawIndicatorStats] = useState<{
+    total: number;
+    ipv4: number;
+    domain: number;
+    sources: number;
+  } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -69,8 +75,50 @@ export default function IngestSources() {
     }
   };
 
+  async function loadRawIndicatorStats() {
+    try {
+      // Count total active raw indicators
+      const { count: totalCount } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .is('removed_at', null);
+
+      // Count IPv4 indicators
+      const { count: ipv4Count } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .eq('kind', 'ipv4')
+        .is('removed_at', null);
+
+      // Count domain indicators
+      const { count: domainCount } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .eq('kind', 'domain')
+        .is('removed_at', null);
+
+      // Count unique sources
+      const { data: uniqueSources } = await supabase
+        .from('raw_indicators')
+        .select('source')
+        .is('removed_at', null);
+
+      const sourcesSet = new Set(uniqueSources?.map(s => s.source) || []);
+
+      setRawIndicatorStats({
+        total: totalCount || 0,
+        ipv4: ipv4Count || 0,
+        domain: domainCount || 0,
+        sources: sourcesSet.size
+      });
+    } catch (error) {
+      console.error('Error loading raw indicator stats:', error);
+    }
+  }
+
   useEffect(() => {
     loadSources();
+    loadRawIndicatorStats();
   }, []);
 
   useEffect(() => {
@@ -222,6 +270,7 @@ export default function IngestSources() {
         setUploadConfig({ kind: 'ipv4', sourceName: '', file: null });
         if (fileInputRef.current) fileInputRef.current.value = '';
         loadSources();
+        loadRawIndicatorStats();
       } else {
         toast.error('Upload failed: ' + result.errorDetails.join(', '));
       }
@@ -382,7 +431,7 @@ export default function IngestSources() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>IPv4 Sources</CardTitle>
@@ -402,6 +451,31 @@ export default function IngestSources() {
           <CardContent>
             <div className="text-2xl font-bold">{domainSources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Total indicators collected</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Database Raw Indicators</CardTitle>
+            <CardDescription>
+              {rawIndicatorStats ? (
+                <>
+                  <Badge variant="outline" className="mr-2">{rawIndicatorStats.sources} sources</Badge>
+                </>
+              ) : 'Loading...'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {rawIndicatorStats ? rawIndicatorStats.total.toLocaleString() : '...'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rawIndicatorStats ? (
+                <>
+                  IPv4: {rawIndicatorStats.ipv4.toLocaleString()} / Domains: {rawIndicatorStats.domain.toLocaleString()}
+                </>
+              ) : 'Loading statistics...'}
+            </p>
           </CardContent>
         </Card>
       </div>

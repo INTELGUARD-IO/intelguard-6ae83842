@@ -76,6 +76,36 @@ Deno.serve(async (req) => {
     const kind = formData.get('kind') as string;
     const sourceName = formData.get('sourceName') as string;
 
+    // Create or update source in ingest_sources
+    let sourceId: string | null = null;
+    const { data: existingSource } = await supabase
+      .from('ingest_sources')
+      .select('id')
+      .eq('name', sourceName)
+      .maybeSingle();
+
+    if (existingSource) {
+      sourceId = existingSource.id;
+    } else {
+      const { data: newSource, error: sourceError } = await supabase
+        .from('ingest_sources')
+        .insert({
+          name: sourceName,
+          url: `manual-upload-${Date.now()}`,
+          kind,
+          description: `Manually uploaded file: ${file.name}`,
+          enabled: true
+        })
+        .select('id')
+        .single();
+
+      if (sourceError) {
+        console.error('Error creating source:', sourceError);
+      } else {
+        sourceId = newSource?.id || null;
+      }
+    }
+
     if (!file || !kind || !sourceName) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: file, kind, sourceName' }),
@@ -177,6 +207,26 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Upload complete: ${result.added} added, ${result.duplicates} duplicates, ${result.errors} errors`);
+
+    // Update indicators_count for the source
+    if (sourceId && result.added > 0) {
+      const { data: countData } = await supabase
+        .from('raw_indicators')
+        .select('id', { count: 'exact', head: true })
+        .eq('source', sourceName)
+        .is('removed_at', null);
+
+      if (countData !== null) {
+        await supabase
+          .from('ingest_sources')
+          .update({ 
+            indicators_count: countData || 0,
+            last_run: new Date().toISOString(),
+            last_success: new Date().toISOString()
+          })
+          .eq('id', sourceId);
+      }
+    }
 
     return new Response(
       JSON.stringify(result),
