@@ -58,42 +58,188 @@ export default function Validators() {
     try {
       const stats: ValidatorStats[] = [];
 
-      for (const validator of validatorList) {
-        // For each validator, query the vendor_checks table instead
-        const checksResult = await supabase
-          .from('vendor_checks')
-          .select('score, checked_at, indicator')
-          .ilike('vendor', validator.name.toLowerCase())
-          .order('checked_at', { ascending: false })
-          .limit(1000);
+      // AbuseIPDB
+      const abuseipdbData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('abuseipdb_score, last_validated')
+        .eq('abuseipdb_checked', true);
+      
+      const abuseipdbRecentCount = await supabase
+        .from('abuseipdb_blacklist')
+        .select('*', { count: 'exact', head: true })
+        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-        const checksData = checksResult.data || [];
-        
-        // Count total unique indicators checked
-        const uniqueIndicators = new Set(checksData.map(c => c.indicator));
-        const totalChecks = uniqueIndicators.size;
+      stats.push({
+        name: 'AbuseIPDB',
+        totalChecks: abuseipdbData.data?.length || 0,
+        recentChecks: abuseipdbRecentCount.count || 0,
+        avgScore: abuseipdbData.data?.length ? 
+          abuseipdbData.data.reduce((sum, r) => sum + (r.abuseipdb_score || 0), 0) / abuseipdbData.data.length : 0,
+        lastCheck: abuseipdbData.data?.[0]?.last_validated || null
+      });
 
-        // Count recent checks (last 24h)
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const recentChecks = checksData.filter(c => 
-          new Date(c.checked_at) > twentyFourHoursAgo
-        ).length;
+      // Abuse.ch
+      const abusechData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('last_validated')
+        .eq('abuse_ch_checked', true);
 
-        // Calculate average score
-        const avgScore = checksData.length > 0
-          ? checksData.reduce((sum, c) => sum + (Number(c.score) || 0), 0) / checksData.length
-          : 0;
+      const abusechRecentCount = await supabase
+        .from('abuse_ch_fplist')
+        .select('*', { count: 'exact', head: true })
+        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-        const lastCheck = checksData.length > 0 ? checksData[0].checked_at : null;
+      stats.push({
+        name: 'Abuse.ch',
+        totalChecks: abusechData.data?.length || 0,
+        recentChecks: abusechRecentCount.count || 0,
+        avgScore: 0,
+        lastCheck: abusechData.data?.[0]?.last_validated || null
+      });
 
-        stats.push({
-          name: validator.name,
-          totalChecks,
-          recentChecks,
-          avgScore: Math.round(avgScore * 100) / 100,
-          lastCheck
-        });
-      }
+      // VirusTotal
+      const vtData = await supabase
+        .from('vendor_checks')
+        .select('score, checked_at')
+        .ilike('vendor', 'virustotal')
+        .order('checked_at', { ascending: false });
+
+      const vtRecentCount = await supabase
+        .from('vendor_checks')
+        .select('*', { count: 'exact', head: true })
+        .ilike('vendor', 'virustotal')
+        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'VirusTotal',
+        totalChecks: vtData.data?.length || 0,
+        recentChecks: vtRecentCount.count || 0,
+        avgScore: vtData.data?.length ?
+          vtData.data.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / vtData.data.length : 0,
+        lastCheck: vtData.data?.[0]?.checked_at || null
+      });
+
+      // URLScan
+      const urlscanData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('urlscan_score, last_validated')
+        .eq('urlscan_checked', true);
+
+      const urlscanRecentCount = await supabase
+        .from('dynamic_raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .eq('urlscan_checked', true)
+        .gte('last_validated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'URLScan',
+        totalChecks: urlscanData.data?.length || 0,
+        recentChecks: urlscanRecentCount.count || 0,
+        avgScore: urlscanData.data?.length ?
+          urlscanData.data.reduce((sum, r) => sum + (r.urlscan_score || 0), 0) / urlscanData.data.length : 0,
+        lastCheck: urlscanData.data?.[0]?.last_validated || null
+      });
+
+      // NeutrinoAPI
+      const neutrinoData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('neutrinoapi_host_reputation_score, last_validated')
+        .eq('neutrinoapi_checked', true);
+
+      const neutrinoRecentCount = await supabase
+        .from('neutrinoapi_blocklist')
+        .select('*', { count: 'exact', head: true })
+        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'NeutrinoAPI',
+        totalChecks: neutrinoData.data?.length || 0,
+        recentChecks: neutrinoRecentCount.count || 0,
+        avgScore: neutrinoData.data?.length ?
+          neutrinoData.data.reduce((sum, r) => sum + (r.neutrinoapi_host_reputation_score || 0), 0) / neutrinoData.data.length : 0,
+        lastCheck: neutrinoData.data?.[0]?.last_validated || null
+      });
+
+      // HoneyDB
+      const honeydbData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('honeydb_threat_score, last_validated')
+        .eq('honeydb_checked', true);
+
+      const honeydbRecentCount = await supabase
+        .from('honeydb_blacklist')
+        .select('*', { count: 'exact', head: true })
+        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'HoneyDB',
+        totalChecks: honeydbData.data?.length || 0,
+        recentChecks: honeydbRecentCount.count || 0,
+        avgScore: honeydbData.data?.length ?
+          honeydbData.data.reduce((sum, r) => sum + (r.honeydb_threat_score || 0), 0) / honeydbData.data.length : 0,
+        lastCheck: honeydbData.data?.[0]?.last_validated || null
+      });
+
+      // Censys
+      const censysData = await supabase
+        .from('dynamic_raw_indicators')
+        .select('censys_score, last_validated')
+        .eq('censys_checked', true);
+
+      const censysRecentCount = await supabase
+        .from('dynamic_raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .eq('censys_checked', true)
+        .gte('last_validated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'Censys',
+        totalChecks: censysData.data?.length || 0,
+        recentChecks: censysRecentCount.count || 0,
+        avgScore: censysData.data?.length ?
+          censysData.data.reduce((sum, r) => sum + (r.censys_score || 0), 0) / censysData.data.length : 0,
+        lastCheck: censysData.data?.[0]?.last_validated || null
+      });
+
+      // OTX
+      const otxData = await supabase
+        .from('otx_enrichment')
+        .select('score, refreshed_at')
+        .order('refreshed_at', { ascending: false });
+
+      const otxRecentCount = await supabase
+        .from('otx_enrichment')
+        .select('*', { count: 'exact', head: true })
+        .gte('refreshed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'OTX',
+        totalChecks: otxData.data?.length || 0,
+        recentChecks: otxRecentCount.count || 0,
+        avgScore: otxData.data?.length ?
+          otxData.data.reduce((sum, r) => sum + (r.score || 0), 0) / otxData.data.length : 0,
+        lastCheck: otxData.data?.[0]?.refreshed_at || null
+      });
+
+      // Google Safe Browsing
+      const safebrowsingData = await supabase
+        .from('google_safebrowsing_cache')
+        .select('score, checked_at')
+        .order('checked_at', { ascending: false });
+
+      const safebrowsingRecentCount = await supabase
+        .from('google_safebrowsing_cache')
+        .select('*', { count: 'exact', head: true })
+        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      stats.push({
+        name: 'Google Safe Browsing',
+        totalChecks: safebrowsingData.data?.length || 0,
+        recentChecks: safebrowsingRecentCount.count || 0,
+        avgScore: safebrowsingData.data?.length ?
+          safebrowsingData.data.reduce((sum, r) => sum + (r.score || 0), 0) / safebrowsingData.data.length : 0,
+        lastCheck: safebrowsingData.data?.[0]?.checked_at || null
+      });
 
       setValidators(stats);
     } catch (error) {
