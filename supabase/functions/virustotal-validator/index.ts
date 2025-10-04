@@ -12,17 +12,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify CRON secret
+    // Allow either CRON secret OR valid JWT token
     const cronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('authorization');
     const expectedSecret = Deno.env.get('CRON_SECRET');
     
-    if (cronSecret !== expectedSecret) {
-      console.log('Invalid or missing CRON secret');
+    const isValidCronCall = cronSecret === expectedSecret;
+    const isAuthenticatedUser = authHeader && authHeader.startsWith('Bearer ');
+    
+    if (!isValidCronCall && !isAuthenticatedUser) {
+      console.log('Unauthorized: Missing CRON secret or JWT authentication');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }), 
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const executionSource = isValidCronCall ? 'CRON' : 'Manual UI';
+    console.log(`Starting VirusTotal validator (source: ${executionSource})...\n`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -31,8 +38,6 @@ Deno.serve(async (req) => {
     if (!vtApiKey) {
       throw new Error('VIRUSTOTAL_API_KEY not configured');
     }
-
-    console.log('Starting VirusTotal validator...\n');
 
     // Test credentials
     console.log('Testing VirusTotal credentials...');

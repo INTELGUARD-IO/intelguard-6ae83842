@@ -213,23 +213,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  // If authenticated via JWT, verify user is logged in
-  if (isAuthenticatedUser && !isValidCronCall) {
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('❌ Invalid authentication token');
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
-    console.log(`✅ Manual execution triggered by user: ${user.email}`);
-  }
-
-  const executionSource = isValidCronCall ? 'CRON' : 'Manual';
+  const executionSource = isValidCronCall ? 'CRON' : 'Manual UI';
   const executionStart = Date.now();
   console.log(`🚀 Google Safe Browsing Validator started (source: ${executionSource})`);
 

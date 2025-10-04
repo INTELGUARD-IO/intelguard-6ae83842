@@ -110,17 +110,24 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
   
   try {
-    // Verify CRON secret
+    // Allow either CRON secret OR valid JWT token
     const cronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('authorization');
     const expectedSecret = Deno.env.get('CRON_SECRET');
     
-    if (cronSecret !== expectedSecret) {
-      console.error('Invalid CRON secret');
+    const isValidCronCall = cronSecret === expectedSecret;
+    const isAuthenticatedUser = authHeader && authHeader.startsWith('Bearer ');
+    
+    if (!isValidCronCall && !isAuthenticatedUser) {
+      console.error('Unauthorized: Missing CRON secret or JWT authentication');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const executionSource = isValidCronCall ? 'CRON' : 'Manual UI';
+    console.log(`Starting Censys validator (source: ${executionSource})...`);
 
     // Get environment variables
     const censysApiKey = Deno.env.get('CENSYS_API_KEY');
