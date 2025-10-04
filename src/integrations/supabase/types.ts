@@ -276,6 +276,9 @@ export type Database = {
           neutrinoapi_is_proxy: boolean | null
           neutrinoapi_is_vpn: boolean | null
           neutrinoapi_metadata: Json | null
+          otx_checked: boolean
+          otx_score: number | null
+          otx_verdict: string | null
           source_count: number
           sources: string[]
           urlscan_checked: boolean
@@ -310,6 +313,9 @@ export type Database = {
           neutrinoapi_is_proxy?: boolean | null
           neutrinoapi_is_vpn?: boolean | null
           neutrinoapi_metadata?: Json | null
+          otx_checked?: boolean
+          otx_score?: number | null
+          otx_verdict?: string | null
           source_count?: number
           sources: string[]
           urlscan_checked?: boolean
@@ -344,6 +350,9 @@ export type Database = {
           neutrinoapi_is_proxy?: boolean | null
           neutrinoapi_is_vpn?: boolean | null
           neutrinoapi_metadata?: Json | null
+          otx_checked?: boolean
+          otx_score?: number | null
+          otx_verdict?: string | null
           source_count?: number
           sources?: string[]
           urlscan_checked?: boolean
@@ -678,6 +687,57 @@ export type Database = {
           expires_at?: string
           indicator?: string
           kind?: string
+        }
+        Relationships: []
+      }
+      otx_enrichment: {
+        Row: {
+          asn: string | null
+          authors_count: number | null
+          country: string | null
+          indicator: string
+          kind: string
+          latest_pulse: string | null
+          pulses_count: number | null
+          raw_otx: Json | null
+          reasons: string[] | null
+          refreshed_at: string
+          score: number | null
+          tags: string[] | null
+          ttl_seconds: number | null
+          verdict: string | null
+        }
+        Insert: {
+          asn?: string | null
+          authors_count?: number | null
+          country?: string | null
+          indicator: string
+          kind: string
+          latest_pulse?: string | null
+          pulses_count?: number | null
+          raw_otx?: Json | null
+          reasons?: string[] | null
+          refreshed_at?: string
+          score?: number | null
+          tags?: string[] | null
+          ttl_seconds?: number | null
+          verdict?: string | null
+        }
+        Update: {
+          asn?: string | null
+          authors_count?: number | null
+          country?: string | null
+          indicator?: string
+          kind?: string
+          latest_pulse?: string | null
+          pulses_count?: number | null
+          raw_otx?: Json | null
+          reasons?: string[] | null
+          refreshed_at?: string
+          score?: number | null
+          tags?: string[] | null
+          ttl_seconds?: number | null
+          verdict?: string | null
         }
         Relationships: []
       }
@@ -1102,6 +1162,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_neutrinoapi_blocklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_otx_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.ripestat-enrich]
 verify_jwt = false
+
+[functions.otx-validator]
+verify_jwt = false

@@ -36,6 +36,7 @@ interface Stats {
   whitelistDomains: number;
   whitelistedIndicators: number;
   lastWhitelistSync: string | null;
+  otxValidated: number;
 }
 
 export default function Dashboard() {
@@ -58,6 +59,7 @@ export default function Dashboard() {
     whitelistDomains: 0,
     whitelistedIndicators: 0,
     lastWhitelistSync: null,
+    otxValidated: 0,
   });
   const [loading, setLoading] = useState(true);
   const [syncingWhitelist, setSyncingWhitelist] = useState(false);
@@ -121,7 +123,8 @@ export default function Dashboard() {
         { data: cfRadarData },
         { count: whitelistCount },
         { data: whitelistData },
-        { count: whitelistedCount }
+        { count: whitelistedCount },
+        { count: otxValidatedCount }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -149,7 +152,9 @@ export default function Dashboard() {
         // Cloudflare Radar whitelist domains with last sync
         supabase.from('cloudflare_radar_top_domains').select('added_at').gt('expires_at', new Date().toISOString()).order('added_at', { ascending: false }).limit(1),
         // Whitelisted indicators (confidence = 0)
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0)
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0),
+        // OTX validated indicators
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('otx_checked', true)
       ]);
 
       // Calculate unique sources
@@ -225,6 +230,7 @@ export default function Dashboard() {
         whitelistDomains: whitelistCount || 0,
         whitelistedIndicators: whitelistedCount || 0,
         lastWhitelistSync,
+        otxValidated: otxValidatedCount || 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -486,6 +492,40 @@ export default function Dashboard() {
                           ? new Date(stats.lastWhitelistSync).toLocaleDateString()
                           : 'Never'}
                       </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">OTX Validator</h3>
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={async () => {
+                        try {
+                          toast.info('🔍 Running OTX validation...');
+                          const { error } = await supabase.functions.invoke('otx-validator');
+                          if (error) throw error;
+                          toast.success('✅ OTX validation completed!');
+                          await loadStats();
+                        } catch (error: any) {
+                          console.error('OTX validation error:', error);
+                          toast.error(`❌ OTX validation failed: ${error.message}`);
+                        }
+                      }}
+                    >
+                      <PlayCircle className="h-3 w-3 mr-1" />
+                      Run OTX
+                    </Button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>OTX Validated</span>
+                      <span className="font-mono">{stats.otxValidated || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span className="text-xs">Scoring 0-100 | Cache 24h TTL</span>
                     </div>
                   </div>
                 </div>
