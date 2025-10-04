@@ -110,7 +110,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<Map<string, ThreatMatc
   const logId = await logNetworkCall(
     'Google Safe Browsing API',
     SAFE_BROWSING_API_URL,
-    'batch_threat_check'
+    'api_call'
   );
 
   const threatEntries = urls.map((url) => ({ url }));
