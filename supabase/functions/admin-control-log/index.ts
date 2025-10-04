@@ -332,8 +332,8 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         from: 'INTELGUARD Alerts <onboarding@resend.dev>',
-        to: ['hsc.pisa@gmail.com', 'luca.salvatori.pisa@gmail.com'],
-        subject: `🔍 INTELGUARD Control Log - ${new Date().toLocaleString('it-IT', { 
+        to: ['luca.salvatori.pisa@gmail.com'],
+        subject: `🔍 INTELGUARD Control Log - ${new Date().toLocaleString('it-IT', {
           hour: '2-digit', 
           minute: '2-digit',
           day: '2-digit',
