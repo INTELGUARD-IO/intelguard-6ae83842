@@ -1110,6 +1110,30 @@ export type Database = {
         }
         Relationships: []
       }
+      validator_status: {
+        Row: {
+          last_error: string | null
+          quota_reset_at: string | null
+          status: string
+          updated_at: string
+          validator_name: string
+        }
+        Insert: {
+          last_error?: string | null
+          quota_reset_at?: string | null
+          status?: string
+          updated_at?: string
+          validator_name: string
+        }
+        Update: {
+          last_error?: string | null
+          quota_reset_at?: string | null
+          status?: string
+          updated_at?: string
+          validator_name?: string
+        }
+        Relationships: []
+      }
       vendor_checks: {
         Row: {
           checked_at: string

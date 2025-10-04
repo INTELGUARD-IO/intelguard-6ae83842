@@ -389,8 +389,11 @@ async function validateIndicator(
     try {
       console.log(`[Phase 1] Invoking ${validatorName}...`);
       
-      // Invoke the validator edge function
+      // Invoke the validator edge function with CRON secret
       const { data, error } = await supabase.functions.invoke(validatorName, {
+        headers: {
+          'x-cron-secret': CRON_SECRET || ''
+        },
         body: { 
           indicators: [indicator.indicator],
           kind: indicator.kind 
@@ -445,6 +448,9 @@ async function validateIndicator(
         console.log(`[Phase 2] Invoking ${validatorName}...`);
         
         const { data, error } = await supabase.functions.invoke(validatorName, {
+          headers: {
+            'x-cron-secret': CRON_SECRET || ''
+          },
           body: { 
             indicators: [indicator.indicator],
             kind: indicator.kind 

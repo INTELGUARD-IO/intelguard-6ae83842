@@ -125,47 +125,85 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to download blocklist: ${blocklistResponse.statusText}`);
       }
 
-      const blocklistText = await blocklistResponse.text();
-      const blDuration = Date.now() - blStartTime;
-      console.log(`Raw response length: ${blocklistText.length} chars`);
-      console.log(`First 500 chars:`, blocklistText.substring(0, 500));
+      // Stream CSV instead of loading all into memory
+      console.log('Streaming CSV response...');
+      const reader = blocklistResponse.body?.getReader();
+      const decoder = new TextDecoder();
       
-      if (networkLogId) {
-        await updateNetworkLog(supabaseUrl, supabaseServiceKey, networkLogId, {
-          status: 'completed',
-          status_code: blocklistResponse.status,
-          response_time_ms: blDuration,
-          bytes_transferred: blocklistText.length
-        });
+      let buffer = '';
+      let lineCount = 0;
+      let bytesTransferred = 0;
+      const batchSize = 1000;
+      let currentBatch: NeutrinoBlocklistEntry[] = [];
+      let batchNumber = 1;
+      
+      if (!reader) {
+        throw new Error('Response body reader not available');
       }
       
-      const blocklistLines = blocklistText.trim().split('\n').filter(line => line && !line.startsWith('#'));
-      console.log(`Downloaded ${blocklistLines.length} blocklist entries\n`);
-
-      // Parse blocklist
-      for (const line of blocklistLines) {
-        const parts = line.split(',');
-        if (parts.length >= 1) {
-          const ip = parts[0].trim();
-          const category = parts[1]?.trim() || 'unknown';
-          if (ip) {
-            blocklistEntries.push({ ip, category });
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (value) {
+          bytesTransferred += value.length;
+          buffer += decoder.decode(value, { stream: !done });
+          
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (!line || line.startsWith('#')) continue;
+            
+            const parts = line.split(',');
+            if (parts.length >= 1) {
+              const ip = parts[0].trim();
+              const category = parts[1]?.trim() || 'unknown';
+              if (ip && ip.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+                currentBatch.push({ ip, category });
+                lineCount++;
+                
+                // Insert batch when size reached
+                if (currentBatch.length >= batchSize) {
+                  const insertData = currentBatch.map(entry => ({
+                    indicator: entry.ip,
+                    kind: 'ipv4',
+                    category: entry.category,
+                    added_at: new Date().toISOString(),
+                    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                  }));
+                  
+                  await supabaseQuery(
+                    supabaseUrl,
+                    supabaseServiceKey,
+                    'neutrinoapi_blocklist',
+                    'POST',
+                    insertData
+                  );
+                  
+                  console.log(`Batch ${batchNumber}: Inserted ${currentBatch.length} entries (${lineCount} total)`);
+                  blocklistEntries.push(...currentBatch);
+                  currentBatch = [];
+                  batchNumber++;
+                }
+              }
+            }
           }
         }
+        
+        if (done) break;
       }
-
-      // Batch insert blocklist (1000 per batch)
-      const batchSize = 1000;
-      for (let i = 0; i < blocklistEntries.length; i += batchSize) {
-        const batch = blocklistEntries.slice(i, i + batchSize);
-        const insertData = batch.map(entry => ({
+      
+      // Insert remaining entries
+      if (currentBatch.length > 0) {
+        const insertData = currentBatch.map(entry => ({
           indicator: entry.ip,
           kind: 'ipv4',
           category: entry.category,
           added_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         }));
-
+        
         await supabaseQuery(
           supabaseUrl,
           supabaseServiceKey,
@@ -173,8 +211,23 @@ Deno.serve(async (req) => {
           'POST',
           insertData
         );
-        console.log(`Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(blocklistEntries.length / batchSize)}`);
+        
+        console.log(`Batch ${batchNumber}: Inserted ${currentBatch.length} entries (${lineCount} total)`);
+        blocklistEntries.push(...currentBatch);
       }
+      
+      const blDuration = Date.now() - blStartTime;
+      console.log(`✓ Streamed ${lineCount} blocklist entries (${Math.round(bytesTransferred / 1024 / 1024)}MB)`);
+      
+      if (networkLogId) {
+        await updateNetworkLog(supabaseUrl, supabaseServiceKey, networkLogId, {
+          status: 'completed',
+          status_code: blocklistResponse.status,
+          response_time_ms: blDuration,
+          bytes_transferred: bytesTransferred
+        });
+      }
+      
       console.log('✓ Blocklist updated\n');
       
     } catch (error) {

@@ -39,6 +39,48 @@ Deno.serve(async (req) => {
       throw new Error('VIRUSTOTAL_API_KEY not configured');
     }
 
+    // Check validator status first
+    console.log('Checking validator status...');
+    const statusCheck = await supabaseQuery(
+      supabaseUrl,
+      supabaseServiceKey,
+      'validator_status',
+      'GET',
+      null,
+      '?validator_name=eq.virustotal&select=*'
+    );
+
+    if (statusCheck && statusCheck.length > 0) {
+      const status = statusCheck[0];
+      if (status.status === 'quota_exceeded' && status.quota_reset_at) {
+        const resetTime = new Date(status.quota_reset_at);
+        const now = new Date();
+        
+        if (now < resetTime) {
+          console.log(`⏸️  Validator paused due to quota. Reset at: ${resetTime.toISOString()}`);
+          return new Response(
+            JSON.stringify({ 
+              message: 'Validator paused due to quota exceeded',
+              quota_reset_at: resetTime.toISOString(),
+              validated: 0
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // Reset time passed, reactivate validator
+          console.log('✓ Quota reset time passed, reactivating validator');
+          await supabaseQuery(
+            supabaseUrl,
+            supabaseServiceKey,
+            'validator_status',
+            'PATCH',
+            { status: 'active', quota_reset_at: null, last_error: null },
+            '?validator_name=eq.virustotal'
+          );
+        }
+      }
+    }
+
     // Test credentials
     console.log('Testing VirusTotal credentials...');
     const testResponse = await fetch('https://www.virustotal.com/api/v3/ip_addresses/8.8.8.8', {
@@ -52,6 +94,41 @@ Deno.serve(async (req) => {
     if (!testResponse.ok) {
       const errorText = await testResponse.text();
       console.error('Credential test failed:', testResponse.status, errorText);
+      
+      // Handle quota exceeded (429) gracefully
+      if (testResponse.status === 429) {
+        console.log('⚠️  VirusTotal quota exceeded, pausing validator');
+        
+        // Calculate reset time (24 hours from now for daily quota)
+        const resetTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        
+        // Upsert validator status
+        await supabaseQuery(
+          supabaseUrl,
+          supabaseServiceKey,
+          'validator_status',
+          'POST',
+          {
+            validator_name: 'virustotal',
+            status: 'quota_exceeded',
+            quota_reset_at: resetTime.toISOString(),
+            last_error: errorText,
+            updated_at: new Date().toISOString()
+          }
+        );
+        
+        console.log(`Validator paused until ${resetTime.toISOString()}`);
+        
+        return new Response(
+          JSON.stringify({ 
+            message: 'Quota exceeded, validator paused',
+            quota_reset_at: resetTime.toISOString(),
+            validated: 0
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       throw new Error(`Invalid VirusTotal credentials: ${testResponse.statusText}`);
     }
     console.log('✓ Credentials validated\n');
@@ -137,6 +214,30 @@ Deno.serve(async (req) => {
           apiCalls++;
 
           if (!response.ok) {
+            // Handle quota exceeded gracefully
+            if (response.status === 429) {
+              console.log('⚠️  Quota exceeded during processing, pausing validator');
+              
+              const resetTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+              
+              await supabaseQuery(
+                supabaseUrl,
+                supabaseServiceKey,
+                'validator_status',
+                'POST',
+                {
+                  validator_name: 'virustotal',
+                  status: 'quota_exceeded',
+                  quota_reset_at: resetTime.toISOString(),
+                  last_error: 'Quota exceeded during indicator processing',
+                  updated_at: new Date().toISOString()
+                }
+              );
+              
+              console.log(`Validator paused until ${resetTime.toISOString()}`);
+              break; // Stop processing
+            }
+            
             console.error(`VirusTotal API error for ${indicator}:`, response.status);
             continue;
           }
@@ -207,6 +308,30 @@ Deno.serve(async (req) => {
             processed++;
             continue;
           } else {
+            // Handle quota exceeded gracefully
+            if (response.status === 429) {
+              console.log('⚠️  Quota exceeded during processing, pausing validator');
+              
+              const resetTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+              
+              await supabaseQuery(
+                supabaseUrl,
+                supabaseServiceKey,
+                'validator_status',
+                'POST',
+                {
+                  validator_name: 'virustotal',
+                  status: 'quota_exceeded',
+                  quota_reset_at: resetTime.toISOString(),
+                  last_error: 'Quota exceeded during indicator processing',
+                  updated_at: new Date().toISOString()
+                }
+              );
+              
+              console.log(`Validator paused until ${resetTime.toISOString()}`);
+              break; // Stop processing
+            }
+            
             console.error(`VirusTotal API error for ${indicator}:`, response.status);
             continue;
           }
