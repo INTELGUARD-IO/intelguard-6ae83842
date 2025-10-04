@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ValidatorStatsCard } from '@/components/ValidatorStatsCard';
 
 interface Indicator {
   indicator: string;
@@ -91,7 +92,7 @@ export default function Indicators() {
         <div>
           <h1 className="text-3xl font-bold">Threat Indicators</h1>
           <p className="text-muted-foreground mt-1">
-            Validated malicious indicators from multiple sources
+            Validated threats from multi-validator consensus (OTX, SafeBrowsing, AbuseIPDB, NeutrinoAPI, URLScan, HoneyDB, Abuse.ch, VirusTotal, Censys)
           </p>
         </div>
         <Button onClick={exportIndicators} variant="outline">
@@ -100,15 +101,19 @@ export default function Indicators() {
         </Button>
       </div>
 
+      <ValidatorStatsCard />
+
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Indicators Database</CardTitle>
-              <CardDescription>
-                {filteredIndicators.length} indicators found
-              </CardDescription>
-            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Indicators Database</CardTitle>
+                <CardDescription>
+                  {filteredIndicators.length} validated threats | 
+                  IPv4: {indicators.filter(i => i.kind === 'ipv4').length} | 
+                  Domains: {indicators.filter(i => i.kind === 'domain').length}
+                </CardDescription>
+              </div>
             <div className="flex items-center gap-2">
               <div className="relative w-[300px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

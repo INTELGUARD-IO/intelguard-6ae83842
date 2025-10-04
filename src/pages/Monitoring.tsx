@@ -12,6 +12,7 @@ import { Activity, AlertCircle, CheckCircle, Clock, Database, Play, PlayCircle, 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AbuseIPDBQuotaWidget } from "@/components/AbuseIPDBQuotaWidget";
+import { ValidatorConsensusWidget } from "@/components/ValidatorConsensusWidget";
 
 interface MetricData {
   label: string;
@@ -436,6 +437,34 @@ const Monitoring = () => {
     }
   };
 
+  const forceIntelligentValidation = async () => {
+    try {
+      toast({
+        title: "🧠 Avvio validazione intelligente",
+        description: "Analisi consenso multi-validator...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('intelligent-validator');
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Validazione intelligente completata",
+        description: `Promossi: ${data?.promoted || 0} (IPv4: ${data?.breakdown?.ipv4 || 0}, Domains: ${data?.breakdown?.domains || 0})`,
+      });
+
+      // Ricarica i dati dopo la validazione
+      await loadAllData();
+    } catch (error: any) {
+      console.error('Error forcing intelligent validation:', error);
+      toast({
+        title: "Errore durante la validazione intelligente",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const calculateSystemHealth = async () => {
     try {
       const { count: pendingCount } = await supabase
@@ -656,6 +685,10 @@ const Monitoring = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={forceIntelligentValidation} variant="default" size="sm">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Smart Validator
+          </Button>
           <Button onClick={forceValidation} variant="outline" size="sm">
             <Play className="h-4 w-4 mr-2" />
             Force Validation
@@ -880,7 +913,10 @@ const Monitoring = () => {
       </div>
 
       {/* AbuseIPDB Quota Widget */}
-      <AbuseIPDBQuotaWidget />
+      <div className="grid gap-4 md:grid-cols-2">
+        <AbuseIPDBQuotaWidget />
+        <ValidatorConsensusWidget />
+      </div>
 
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList>

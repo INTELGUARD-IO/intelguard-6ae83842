@@ -138,46 +138,26 @@ serve(async (req) => {
       console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(indicators.length / batchSize)}`);
     }
 
-    // Step 3: Promote high-confidence threats to validated_indicators
-    console.log('\n🎯 Step 3: Promoting validated threats to production table...');
+    // Step 3: Call intelligent-validator for smart promotion
+    console.log('\n🎯 Step 3: Calling intelligent-validator for multi-source consensus...');
     
-    const { data: validatedThreats, error: threatsError } = await supabase
-      .from('dynamic_raw_indicators')
-      .select('indicator, kind, confidence, country, asn')
-      .gte('confidence', 50)
-      .eq('whitelisted', false)
-      .limit(50000);
-
     let promoted = 0;
-    if (threatsError) {
-      console.warn('⚠️ Failed to fetch validated threats:', threatsError.message);
-    } else if (validatedThreats && validatedThreats.length > 0) {
-      console.log(`📋 Found ${validatedThreats.length} validated threats to promote`);
+    try {
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke('intelligent-validator');
       
-      const promoteBatchSize = 500;
-      for (let i = 0; i < validatedThreats.length; i += promoteBatchSize) {
-        const batch = validatedThreats.slice(i, i + promoteBatchSize);
-        
-        const { error: upsertError } = await supabase
-          .from('validated_indicators')
-          .upsert(batch.map(t => ({
-            indicator: t.indicator,
-            kind: t.kind,
-            confidence: t.confidence,
-            country: t.country || null,
-            asn: t.asn || null,
-            last_validated: new Date().toISOString()
-          })), { onConflict: 'indicator,kind' });
-        
-        if (upsertError) {
-          console.error(`❌ Promotion batch ${Math.floor(i / promoteBatchSize) + 1} failed:`, upsertError.message);
-        } else {
-          promoted += batch.length;
-          console.log(`✅ Promoted batch ${Math.floor(i / promoteBatchSize) + 1}/${Math.ceil(validatedThreats.length / promoteBatchSize)}`);
+      if (validationError) {
+        console.warn('⚠️ Intelligent validator error:', validationError.message);
+      } else if (validationResult) {
+        promoted = validationResult.promoted || 0;
+        console.log(`🎉 Intelligent validator promoted: ${promoted} indicators`);
+        if (validationResult.breakdown) {
+          console.log(`   - IPv4: ${validationResult.breakdown.ipv4}`);
+          console.log(`   - Domains: ${validationResult.breakdown.domains}`);
+          console.log(`   - Skipped: ${validationResult.breakdown.skipped}`);
         }
       }
-      
-      console.log(`🎉 Total promoted: ${promoted} validated threats`);
+    } catch (err) {
+      console.error('❌ Failed to call intelligent-validator:', err);
     }
 
     const executionTime = Date.now() - startTime;
