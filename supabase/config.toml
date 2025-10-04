@@ -1,5 +1,8 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.validation-orchestrator]
+verify_jwt = false
+
 [functions.google-safebrowsing-validator]
 verify_jwt = false
 
