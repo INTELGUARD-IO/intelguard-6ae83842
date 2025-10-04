@@ -722,6 +722,40 @@ export default function System() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Admin Control Log Email
+                </CardTitle>
+                <CardDescription>
+                  Send test control log email to administrators
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Recipients: hsc.pisa@gmail.com, luca.salvatori.pisa@gmail.com
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('admin-control-log')}
+                  disabled={loading['admin-control-log']}
+                  className="w-full"
+                >
+                  {loading['admin-control-log'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Sending Email...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Send Test Email
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
