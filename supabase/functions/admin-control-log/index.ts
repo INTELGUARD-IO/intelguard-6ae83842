@@ -13,16 +13,53 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Verify cron secret
+    // Verify authentication: either cron secret OR valid JWT
     const cronSecret = req.headers.get('x-cron-secret');
     const expectedSecret = Deno.env.get('CRON_SECRET');
+    const authHeader = req.headers.get('authorization');
     
-    if (cronSecret !== expectedSecret) {
-      console.error('Invalid cron secret');
+    const isCronCall = cronSecret === expectedSecret;
+    const hasAuthToken = authHeader?.startsWith('Bearer ');
+    
+    if (!isCronCall && !hasAuthToken) {
+      console.error('Unauthorized: No valid cron secret or auth token');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+    
+    // If auth token present (manual call from UI), verify user is super admin
+    if (hasAuthToken && !isCronCall) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader! } } }
+      );
+      
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Invalid user token:', userError);
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Verify super admin (hardcoded UUID from is_super_admin function)
+      const superAdminId = '6a251925-6da6-4e88-a4c2-a5624308fe8e';
+      if (user.id !== superAdminId) {
+        console.error('User is not super admin');
+        return new Response(JSON.stringify({ error: 'Forbidden: Super admin only' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log('Manual call from super admin:', user.email);
+    } else {
+      console.log('Cron call authenticated');
     }
 
     // Initialize Supabase client
