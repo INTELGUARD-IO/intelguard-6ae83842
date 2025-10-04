@@ -47,7 +47,18 @@ Deno.serve(async (req) => {
     const cronSecretHeader = req.headers.get('x-cron-secret');
     
     const isCronCall = cronSecretHeader === cronSecret;
-    const isAuthenticatedUser = authHeader?.startsWith('Bearer ');
+    
+    // Verify JWT for manual UI calls
+    let isAuthenticatedUser = false;
+    if (!isCronCall && authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        isAuthenticatedUser = !error && !!user;
+      } catch (error) {
+        console.error('JWT verification error:', error);
+      }
+    }
     
     if (!isCronCall && !isAuthenticatedUser) {
       return new Response(

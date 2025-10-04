@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { supabaseQuery, supabaseUpsert } from '../_shared/supabase-rest.ts';
 import { logNetworkCall, updateNetworkLog } from '../_shared/network-logger.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const OTX_API_KEY = Deno.env.get('OTX_API_KEY');
 const OTX_BASE_URL = 'https://otx.alienvault.com/api/v1';
@@ -368,9 +369,28 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Allow both CRON secret (for automated calls) and JWT auth (for manual UI calls)
     const cronSecret = req.headers.get('x-cron-secret');
-    if (cronSecret !== CRON_SECRET) {
-      console.error('❌ Invalid or missing CRON secret');
+    const authHeader = req.headers.get('Authorization');
+    
+    // Check CRON secret first (for automated calls)
+    const isCronAuthenticated = cronSecret === CRON_SECRET;
+    
+    // Check JWT auth for manual UI calls
+    let isUserAuthenticated = false;
+    if (!isCronAuthenticated && authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        isUserAuthenticated = !error && !!user;
+      } catch (error) {
+        console.error('JWT verification error:', error);
+      }
+    }
+    
+    if (!isCronAuthenticated && !isUserAuthenticated) {
+      console.error('❌ Invalid or missing CRON secret / JWT authentication');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }), 
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
