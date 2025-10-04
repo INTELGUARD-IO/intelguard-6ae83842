@@ -59,16 +59,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user is admin
-    const { data: memberData, error: roleError } = await supabase
-      .from('tenant_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
+    // Check if user is super admin
+    const { data: isSuperAdmin, error: roleError } = await supabase
+      .rpc('is_super_admin', { _user_id: user.id });
 
-    if (roleError || memberData?.role !== 'admin') {
+    if (roleError || !isSuperAdmin) {
       return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
+        JSON.stringify({ error: 'Super admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
