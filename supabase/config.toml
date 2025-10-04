@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.censys-validator]
 verify_jwt = false
+
+[functions.ripestat-enrich]
+verify_jwt = false

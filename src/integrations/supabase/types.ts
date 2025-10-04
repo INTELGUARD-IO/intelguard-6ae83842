@@ -597,6 +597,72 @@ export type Database = {
         }
         Relationships: []
       }
+      ripestat_enrichment: {
+        Row: {
+          abuse_email: string | null
+          asn: number | null
+          asn_holder: string | null
+          checked_at: string
+          city: string | null
+          country_code: string | null
+          country_name: string | null
+          expires_at: string
+          geolocation_data: Json | null
+          id: string
+          indicator: string
+          kind: string
+          latitude: number | null
+          longitude: number | null
+          network_info: Json | null
+          prefix: string | null
+          ptr_record: string | null
+          routing_status: Json | null
+          whois_data: Json | null
+        }
+        Insert: {
+          abuse_email?: string | null
+          asn?: number | null
+          asn_holder?: string | null
+          checked_at?: string
+          city?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          expires_at?: string
+          geolocation_data?: Json | null
+          id?: string
+          indicator: string
+          kind: string
+          latitude?: number | null
+          longitude?: number | null
+          network_info?: Json | null
+          prefix?: string | null
+          ptr_record?: string | null
+          routing_status?: Json | null
+          whois_data?: Json | null
+        }
+        Update: {
+          abuse_email?: string | null
+          asn?: number | null
+          asn_holder?: string | null
+          checked_at?: string
+          city?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          expires_at?: string
+          geolocation_data?: Json | null
+          id?: string
+          indicator?: string
+          kind?: string
+          latitude?: number | null
+          longitude?: number | null
+          network_info?: Json | null
+          prefix?: string | null
+          ptr_record?: string | null
+          routing_status?: Json | null
+          whois_data?: Json | null
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -910,6 +976,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_neutrinoapi_blocklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_ripestat_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

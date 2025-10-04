@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield } from 'lucide-react';
+import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditLogsTab } from '@/components/AuditLogsTab';
 import {
@@ -727,6 +727,40 @@ export default function System() {
                     <>
                       <Play className="h-4 w-4 mr-2" />
                       Check Sources
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  RIPEstat Enrichment
+                </CardTitle>
+                <CardDescription>
+                  Enrich indicators with geolocation and network data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Fetches geolocation, ASN, country, abuse contacts, and network info from RIPEstat for high-confidence indicators. No API key required.
+                </div>
+                <Button
+                  onClick={() => testEdgeFunction('ripestat-enrich')}
+                  disabled={loading['ripestat-enrich']}
+                  className="w-full"
+                >
+                  {loading['ripestat-enrich'] ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Enriching...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Enrichment
                     </>
                   )}
                 </Button>

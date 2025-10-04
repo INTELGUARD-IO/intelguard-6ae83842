@@ -16,6 +16,10 @@ interface Stats {
   validatedIpv4: number;
   validatedDomains: number;
   recentDelta: { added: number; removed: number } | null;
+  
+  // RIPEstat enrichment stats
+  enrichedCount: number;
+  topCountries: Array<{ country: string; count: number }>;
 }
 
 export default function Dashboard() {
@@ -28,6 +32,8 @@ export default function Dashboard() {
     validatedIpv4: 0,
     validatedDomains: 0,
     recentDelta: null,
+    enrichedCount: 0,
+    topCountries: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +50,9 @@ export default function Dashboard() {
         { data: sourcesData },
         { count: validatedIpv4Count },
         { count: validatedDomainCount },
-        { data: deltaData }
+        { data: deltaData },
+        { count: enrichedCount },
+        { data: enrichedData }
       ] = await Promise.all([
         // Raw indicators from raw_indicators
         supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
@@ -54,7 +62,11 @@ export default function Dashboard() {
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
         // Daily deltas
-        supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2)
+        supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2),
+        // RIPEstat enrichment count
+        supabase.from('ripestat_enrichment').select('*', { count: 'exact', head: true }),
+        // RIPEstat data for country stats
+        supabase.from('ripestat_enrichment').select('country_code').gt('expires_at', new Date().toISOString())
       ]);
 
       // Calculate unique sources
@@ -71,6 +83,18 @@ export default function Dashboard() {
         };
       }
 
+      // Calculate top countries from RIPEstat data
+      const countryCounts: Record<string, number> = {};
+      enrichedData?.forEach(item => {
+        if (item.country_code) {
+          countryCounts[item.country_code] = (countryCounts[item.country_code] || 0) + 1;
+        }
+      });
+      const topCountries = Object.entries(countryCounts)
+        .map(([country, count]) => ({ country, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
       setStats({
         rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
         rawIpv4: rawIpv4Count || 0,
@@ -80,6 +104,8 @@ export default function Dashboard() {
         validatedIpv4: validatedIpv4Count || 0,
         validatedDomains: validatedDomainCount || 0,
         recentDelta,
+        enrichedCount: enrichedCount || 0,
+        topCountries,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -290,9 +316,29 @@ export default function Dashboard() {
                       <span>Feed Distribution</span>
                       <span className="text-green-600">Operational</span>
                     </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>RIPEstat Enriched</span>
+                      <span className="font-mono">{stats.enrichedCount.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {stats.topCountries.length > 0 && (
+                <div className="space-y-2 pt-4 border-t">
+                  <h3 className="text-sm font-medium">Top Countries (by IP)</h3>
+                  <div className="space-y-1">
+                    {stats.topCountries.map(({ country, count }) => (
+                      <div key={country} className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{country}</span>
+                        </span>
+                        <span className="font-mono">{count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
