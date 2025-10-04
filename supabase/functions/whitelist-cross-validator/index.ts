@@ -138,6 +138,48 @@ serve(async (req) => {
       console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(indicators.length / batchSize)}`);
     }
 
+    // Step 3: Promote high-confidence threats to validated_indicators
+    console.log('\n🎯 Step 3: Promoting validated threats to production table...');
+    
+    const { data: validatedThreats, error: threatsError } = await supabase
+      .from('dynamic_raw_indicators')
+      .select('indicator, kind, confidence, country, asn')
+      .gte('confidence', 50)
+      .eq('whitelisted', false)
+      .limit(50000);
+
+    let promoted = 0;
+    if (threatsError) {
+      console.warn('⚠️ Failed to fetch validated threats:', threatsError.message);
+    } else if (validatedThreats && validatedThreats.length > 0) {
+      console.log(`📋 Found ${validatedThreats.length} validated threats to promote`);
+      
+      const promoteBatchSize = 500;
+      for (let i = 0; i < validatedThreats.length; i += promoteBatchSize) {
+        const batch = validatedThreats.slice(i, i + promoteBatchSize);
+        
+        const { error: upsertError } = await supabase
+          .from('validated_indicators')
+          .upsert(batch.map(t => ({
+            indicator: t.indicator,
+            kind: t.kind,
+            confidence: t.confidence,
+            country: t.country || null,
+            asn: t.asn || null,
+            last_validated: new Date().toISOString()
+          })), { onConflict: 'indicator,kind' });
+        
+        if (upsertError) {
+          console.error(`❌ Promotion batch ${Math.floor(i / promoteBatchSize) + 1} failed:`, upsertError.message);
+        } else {
+          promoted += batch.length;
+          console.log(`✅ Promoted batch ${Math.floor(i / promoteBatchSize) + 1}/${Math.ceil(validatedThreats.length / promoteBatchSize)}`);
+        }
+      }
+      
+      console.log(`🎉 Total promoted: ${promoted} validated threats`);
+    }
+
     const executionTime = Date.now() - startTime;
     const processingRate = Math.round(indicators.length / (executionTime / 1000));
     
@@ -155,6 +197,7 @@ serve(async (req) => {
       success: true,
       processed: indicators.length,
       whitelisted: totalWhitelisted,
+      validated: promoted,
       breakdown: {
         ciscoOnly: ciscoMatches,
         cloudflareOnly: cloudflareMatches,

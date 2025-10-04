@@ -41,7 +41,7 @@ export default function Indicators() {
         .from('validated_indicators')
         .select('*')
         .order('last_validated', { ascending: false })
-        .limit(100);
+        .limit(1000);
 
       if (activeTab !== 'all') {
         query = query.eq('kind', activeTab);
