@@ -317,6 +317,10 @@ async function processIndicators() {
           tags: allTags,
           reasons: scoring.reasons,
           raw_otx: otxData,
+          // NEW: Store more comprehensive data
+          pulse_info: general.pulse_info || null,
+          passive_dns: otxData.passive_dns || null,
+          url_list: otxData.url_list || null,
           refreshed_at: new Date().toISOString(),
           ttl_seconds: 86400
         };

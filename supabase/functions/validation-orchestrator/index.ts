@@ -102,13 +102,21 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Processing ${indicators.length} indicators`);
 
-    // Step 2: Load Cloudflare Radar Top Domains for false positive filtering
-    const { data: topDomains } = await supabase
+    // Step 2: Load UNIFIED WHITELIST (Cloudflare + Cisco Umbrella) for filtering
+    const { data: cfDomains } = await supabase
       .from('cloudflare_radar_top_domains')
       .select('domain');
     
-    const cloudflareSet = new Set((topDomains || []).map((d: any) => d.domain.toLowerCase()));
-    console.log(`🔍 Loaded ${cloudflareSet.size} Cloudflare Radar top domains for filtering`);
+    const { data: ciscoDomains } = await supabase
+      .from('cisco_umbrella_top_domains')
+      .select('domain');
+    
+    const whitelistSet = new Set([
+      ...((cfDomains || []).map((d: any) => d.domain.toLowerCase())),
+      ...((ciscoDomains || []).map((d: any) => d.domain.toLowerCase()))
+    ]);
+    
+    console.log(`🔍 Loaded ${whitelistSet.size} domains from unified whitelist (CF: ${cfDomains?.length || 0}, Cisco: ${ciscoDomains?.length || 0})`);
 
     // Step 3: Process each indicator
     let processed = 0;
@@ -116,11 +124,38 @@ Deno.serve(async (req) => {
     let whitelisted = 0;
 
     for (const indicator of indicators as IndicatorToValidate[]) {
+      // WHITELIST CHECK - Skip validation if domain is in whitelist
+      if (indicator.kind === 'domain' && whitelistSet.has(indicator.indicator.toLowerCase())) {
+        console.log(`⏩ [WHITELIST] Skipping ${indicator.indicator} - found in whitelist`);
+        
+        // Update confidence = 0 (benign)
+        await supabase
+          .from('dynamic_raw_indicators')
+          .update({ 
+            confidence: 0,
+            last_validated: new Date().toISOString()
+          })
+          .eq('id', indicator.id);
+        
+        // Insert in validated_indicators
+        await supabase
+          .from('validated_indicators')
+          .upsert({
+            indicator: indicator.indicator,
+            kind: indicator.kind,
+            confidence: 0,
+            last_validated: new Date().toISOString()
+          });
+        
+        whitelisted++;
+        processed++;
+        continue; // Skip expensive validation
+      }
       try {
-        const results = await validateIndicator(supabase, indicator, cloudflareSet);
+        const results = await validateIndicator(supabase, indicator, whitelistSet);
         
         // Calculate final confidence
-        const { confidence, agreementCount, isWhitelisted } = calculateConfidence(results, indicator.kind, cloudflareSet.has(indicator.indicator.toLowerCase()));
+        const { confidence, agreementCount, isWhitelisted } = calculateConfidence(results, indicator.kind, whitelistSet.has(indicator.indicator.toLowerCase()));
 
         if (isWhitelisted) {
           whitelisted++;

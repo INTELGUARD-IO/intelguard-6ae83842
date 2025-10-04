@@ -131,6 +131,27 @@ export type Database = {
         }
         Relationships: []
       }
+      cisco_umbrella_top_domains: {
+        Row: {
+          added_at: string
+          domain: string
+          expires_at: string
+          rank: number | null
+        }
+        Insert: {
+          added_at?: string
+          domain: string
+          expires_at?: string
+          rank?: number | null
+        }
+        Update: {
+          added_at?: string
+          domain?: string
+          expires_at?: string
+          rank?: number | null
+        }
+        Relationships: []
+      }
       cloudflare_radar_enrichment: {
         Row: {
           asn: number | null
@@ -749,6 +770,9 @@ export type Database = {
           indicator: string
           kind: string
           latest_pulse: string | null
+          malware_samples: Json | null
+          passive_dns: Json | null
+          pulse_info: Json | null
           pulses_count: number | null
           raw_otx: Json | null
           reasons: string[] | null
@@ -756,6 +780,7 @@ export type Database = {
           score: number | null
           tags: string[] | null
           ttl_seconds: number | null
+          url_list: Json | null
           verdict: string | null
         }
         Insert: {
@@ -765,6 +790,9 @@ export type Database = {
           indicator: string
           kind: string
           latest_pulse?: string | null
+          malware_samples?: Json | null
+          passive_dns?: Json | null
+          pulse_info?: Json | null
           pulses_count?: number | null
           raw_otx?: Json | null
           reasons?: string[] | null
@@ -772,6 +800,7 @@ export type Database = {
           score?: number | null
           tags?: string[] | null
           ttl_seconds?: number | null
+          url_list?: Json | null
           verdict?: string | null
         }
         Update: {
@@ -781,6 +810,9 @@ export type Database = {
           indicator?: string
           kind?: string
           latest_pulse?: string | null
+          malware_samples?: Json | null
+          passive_dns?: Json | null
+          pulse_info?: Json | null
           pulses_count?: number | null
           raw_otx?: Json | null
           reasons?: string[] | null
@@ -788,6 +820,7 @@ export type Database = {
           score?: number | null
           tags?: string[] | null
           ttl_seconds?: number | null
+          url_list?: Json | null
           verdict?: string | null
         }
         Relationships: []
@@ -1229,6 +1262,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_cf_radar_domains: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_cisco_umbrella_domains: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.cloudflare-radar-domains-sync]
 verify_jwt = false
 
+[functions.cisco-umbrella-domains-sync]
+verify_jwt = false
+
 [functions.cloudflare-radar-domain-validator]
 verify_jwt = false
 
