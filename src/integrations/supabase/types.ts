@@ -1112,6 +1112,7 @@ export type Database = {
           indicator: string
           kind: string
           last_validated: string
+          threat_type: string | null
         }
         Insert: {
           asn?: string | null
@@ -1120,6 +1121,7 @@ export type Database = {
           indicator: string
           kind: string
           last_validated?: string
+          threat_type?: string | null
         }
         Update: {
           asn?: string | null
@@ -1128,6 +1130,7 @@ export type Database = {
           indicator?: string
           kind?: string
           last_validated?: string
+          threat_type?: string | null
         }
         Relationships: []
       }
@@ -1256,12 +1259,43 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      enrichment_summary: {
+        Row: {
+          asn: string | null
+          asn_name: string | null
+          country: string | null
+          indicator: string | null
+          kind: string | null
+        }
+        Relationships: []
+      }
+      public_threat_indicators: {
+        Row: {
+          asn: string | null
+          asn_name: string | null
+          confidence: number | null
+          country: string | null
+          first_seen: string | null
+          indicator: string | null
+          kind: string | null
+          last_seen: string | null
+          severity: string | null
+          sources_count: number | null
+          threat_type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _call_edge: {
         Args: { function_name: string }
         Returns: undefined
+      }
+      classify_threat_type: {
+        Args: {
+          indicator_row: Database["public"]["Tables"]["dynamic_raw_indicators"]["Row"]
+        }
+        Returns: string
       }
       clean_expired_abuse_ch_fplist: {
         Args: Record<PropertyKey, never>

@@ -48,6 +48,9 @@ export function AppLayout() {
             <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
               Dashboard
             </Link>
+            <Link to="/threats" className="text-sm font-medium hover:text-primary transition-colors">
+              Threats
+            </Link>
             <Link to="/indicators" className="text-sm font-medium hover:text-primary transition-colors">
               Indicators
             </Link>

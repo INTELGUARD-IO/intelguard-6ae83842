@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Indicators from "./pages/Indicators";
+import Threats from "./pages/Threats";
 import FeedTokens from "./pages/FeedTokens";
 import System from "./pages/System";
 import IngestSources from "./pages/IngestSources";
@@ -30,6 +31,7 @@ const App = () => (
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/indicators" element={<Indicators />} />
+            <Route path="/threats" element={<Threats />} />
             <Route path="/feed-tokens" element={<FeedTokens />} />
             <Route path="/system" element={<System />} />
             <Route path="/ingest-sources" element={<IngestSources />} />
