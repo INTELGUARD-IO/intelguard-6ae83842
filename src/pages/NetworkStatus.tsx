@@ -33,12 +33,13 @@ export default function NetworkStatus() {
   const { toast } = useToast();
 
   const fetchData = async () => {
-    // Fetch active connections
+    // Fetch active connections (limit to 50)
     const { data: active } = await supabase
       .from('network_activity_log')
       .select('*')
       .eq('status', 'active')
-      .order('started_at', { ascending: false });
+      .order('started_at', { ascending: false })
+      .limit(50);
 
     // Fetch recent completed (last 20)
     const { data: completed } = await supabase
