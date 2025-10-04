@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield, Globe } from 'lucide-react';
+import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield, Globe, Search, Code, FileText, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditLogsTab } from '@/components/AuditLogsTab';
 import {
@@ -18,8 +18,46 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+interface EdgeFunction {
+  name: string;
+  title: string;
+  category: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+const edgeFunctions: EdgeFunction[] = [
+  // Data Pipeline
+  { name: 'ingest', title: 'Ingest Function', category: 'Data Pipeline', description: 'Ingest raw indicators from external sources and store them in the database', icon: Database },
+  { name: 'schedule-validations', title: 'Schedule Validations', category: 'Data Pipeline', description: 'Creates validation jobs for recently updated indicators', icon: Clock },
+  { name: 'run-validations', title: 'Run Validations', category: 'Data Pipeline', description: 'Executes queued validation tasks against vendor APIs', icon: Activity },
+  { name: 'daily-delta', title: 'Daily Delta', category: 'Data Pipeline', description: 'Calculate daily changes in indicator counts and statistics', icon: TrendingUp },
+  
+  // Validators
+  { name: 'abuse-ch-validator', title: 'Abuse.ch Validator', category: 'Validators', description: 'Checks indicators against Abuse.ch False Positive list', icon: Shield },
+  { name: 'abuseipdb-validator', title: 'AbuseIPDB Validator', category: 'Validators', description: 'Checks IPs against AbuseIPDB blacklist and validates indicators', icon: Shield },
+  { name: 'honeydb-validator', title: 'HoneyDB Validator', category: 'Validators', description: 'Checks IPs against HoneyDB bad hosts database and assigns threat scores', icon: Shield },
+  { name: 'neutrinoapi-validator', title: 'NeutrinoAPI Validator', category: 'Validators', description: 'Validates IPs via NeutrinoAPI Blocklist + 150 DNSBLs + IP Probe (VPN/Proxy/Hosting detection)', icon: Shield },
+  { name: 'virustotal-validator', title: 'VirusTotal Validator', category: 'Validators', description: 'Queries VirusTotal for IPv4 and domain reputation data (4 req/min, 500/day)', icon: Shield },
+  { name: 'urlscan-validator', title: 'URLScan Validator', category: 'Validators', description: 'Checks domains for malicious activity via URLScan.io API', icon: Shield },
+  { name: 'censys-validator', title: 'Censys Validator', category: 'Validators', description: 'Validate IPs and domains against Censys threat intelligence database', icon: Shield },
+  { name: 'otx-validator', title: 'OTX Validator', category: 'Validators', description: 'Validate indicators against AlienVault OTX (Open Threat Exchange)', icon: Shield },
+  { name: 'cloudflare-radar-domain-validator', title: 'Cloudflare Radar Domain Validator', category: 'Validators', description: 'Validates domains against Cloudflare Radar Top 100K whitelist', icon: Shield },
+  
+  // Enrichment
+  { name: 'bgpview-enrich', title: 'BGPview Enrichment', category: 'Enrichment', description: 'Fetches BGPview data (rDNS, ASN info, country) for IPv4 indicators', icon: Globe },
+  { name: 'ripestat-enrich', title: 'RIPEstat Enrichment', category: 'Enrichment', description: 'Fetches geolocation, ASN, country, abuse contacts, and network info from RIPEstat', icon: Globe },
+  { name: 'cloudflare-radar-enrich', title: 'Cloudflare Radar Enrichment', category: 'Enrichment', description: 'Fetches ASN, country, and prefix data from Cloudflare Radar for IPv4 indicators', icon: Globe },
+  { name: 'abuseipdb-enrich', title: 'AbuseIPDB Enrichment', category: 'Enrichment', description: 'Enrich indicators with AbuseIPDB threat intelligence and abuse reports', icon: Globe },
+  
+  // System
+  { name: 'source-health-check', title: 'Source Health Check', category: 'System', description: 'Tests connectivity for all sources and re-enables those that are back online', icon: Activity },
+  { name: 'cloudflare-radar-domains-sync', title: 'Cloudflare Radar Top 100K Sync', category: 'System', description: 'Downloads and caches Cloudflare Radar Top 100K domains (7-day TTL)', icon: Database },
+];
+
 export default function System() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [lastStatus, setLastStatus] = useState<Record<string, 'idle' | 'running' | 'success' | 'error'>>({});
   const [logs, setLogs] = useState<any[]>([]);
   const [runningAllValidators, setRunningAllValidators] = useState(false);
   const [validatorProgress, setValidatorProgress] = useState<{
@@ -105,6 +143,7 @@ export default function System() {
 
   const testEdgeFunction = async (functionName: string) => {
     setLoading({ ...loading, [functionName]: true });
+    setLastStatus({ ...lastStatus, [functionName]: 'running' });
     
     const validators = ['abuse-ch-validator', 'honeydb-validator', 'abuseipdb-validator'];
     const isValidator = validators.includes(functionName);
@@ -149,6 +188,7 @@ export default function System() {
         executionTime
       );
 
+      setLastStatus({ ...lastStatus, [functionName]: 'success' });
       toast.success(`${functionName} executed successfully`);
       console.log(`${functionName} result:`, data);
       
@@ -168,6 +208,7 @@ export default function System() {
         executionTime
       );
       
+      setLastStatus({ ...lastStatus, [functionName]: 'error' });
       console.error(`Error executing ${functionName}:`, error);
       toast.error(error.message || `Failed to execute ${functionName}`);
     } finally {
@@ -180,6 +221,15 @@ export default function System() {
         setValidatorProgress(null);
       }
       setLoading({ ...loading, [functionName]: false });
+    }
+  };
+
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'running': return 'secondary';
+      case 'success': return 'default';
+      case 'error': return 'destructive';
+      default: return 'outline';
     }
   };
 
@@ -367,609 +417,55 @@ export default function System() {
         </TabsList>
 
         <TabsContent value="functions" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Ingest Function
-                </CardTitle>
-                <CardDescription>
-                  Ingest raw indicators from external sources
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  This function processes raw threat indicators and stores them in the database.
+          <div className="space-y-2">
+            {edgeFunctions.map((func) => (
+              <div 
+                key={func.name} 
+                className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+              >
+                {/* Icon */}
+                <func.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                
+                {/* Info principale */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-base">{func.title}</h3>
+                    {lastStatus[func.name] && lastStatus[func.name] !== 'idle' && (
+                      <Badge variant={getStatusVariant(lastStatus[func.name])}>
+                        {lastStatus[func.name]}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-0.5">{func.category}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{func.description}</p>
+                  {loading[func.name] && validatorProgress?.validator === func.name && (
+                    <p className="text-xs text-primary mt-1">
+                      Progress: {validatorProgress.processed} / {validatorProgress.total}
+                    </p>
+                  )}
                 </div>
+                
+                {/* Bottone */}
                 <Button
-                  onClick={() => testEdgeFunction('ingest')}
-                  disabled={loading['ingest']}
-                  className="w-full"
+                  onClick={() => testEdgeFunction(func.name)}
+                  disabled={loading[func.name] || runningAllValidators}
+                  className="flex-shrink-0"
+                  size="default"
                 >
-                  {loading['ingest'] ? (
+                  {loading[func.name] ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
+                      Running
                     </>
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
-                      Test Ingest
+                      Test
                     </>
                   )}
                 </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Schedule Validations
-                </CardTitle>
-                <CardDescription>
-                  Schedule validation jobs for indicators
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Creates validation jobs for recently updated indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('schedule-validations')}
-                  disabled={loading['schedule-validations']}
-                  className="w-full"
-                >
-                  {loading['schedule-validations'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Test Schedule
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Run Validations
-                </CardTitle>
-                <CardDescription>
-                  Process pending validation jobs
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Executes queued validation tasks against vendor APIs.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('run-validations')}
-                  disabled={loading['run-validations']}
-                  className="w-full"
-                >
-                  {loading['run-validations'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Test Validations
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  BGPview Enrichment
-                </CardTitle>
-                <CardDescription>
-                  Enrich indicators with rDNS, ASN, and country data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Fetches BGPview data (rDNS, ASN info, country) for IPv4 indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('bgpview-enrich')}
-                  disabled={loading['bgpview-enrich']}
-                  className="w-full"
-                >
-                  {loading['bgpview-enrich'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run BGPview
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Cloudflare Radar
-                </CardTitle>
-                <CardDescription>
-                  Enrich with ASN, country, and prefix data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Fetches Cloudflare Radar data (ASN, AS name, country) for IPv4 indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('cloudflare-radar-enrich')}
-                  disabled={loading['cloudflare-radar-enrich']}
-                  className="w-full"
-                >
-                  {loading['cloudflare-radar-enrich'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Cloudflare Radar
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Abuse.ch Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate against Abuse.ch False Positive list
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Checks indicators against Abuse.ch FP list and populates dynamic_raw_indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('abuse-ch-validator')}
-                  disabled={loading['abuse-ch-validator'] || runningAllValidators}
-                  className="w-full"
-                >
-                  {loading['abuse-ch-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                      {validatorProgress?.validator === 'abuse-ch-validator' && (
-                        <span className="ml-2 text-xs">
-                          ({validatorProgress.processed} / {validatorProgress.total})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Abuse.ch
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  AbuseIPDB Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate IPv4 against AbuseIPDB blacklist
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Checks IPs against AbuseIPDB blacklist and validates indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('abuseipdb-validator')}
-                  disabled={loading['abuseipdb-validator'] || runningAllValidators}
-                  className="w-full"
-                >
-                  {loading['abuseipdb-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                      {validatorProgress?.validator === 'abuseipdb-validator' && (
-                        <span className="ml-2 text-xs">
-                          ({validatorProgress.processed} / {validatorProgress.total})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run AbuseIPDB
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  URLScan Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate domains against URLScan.io
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Checks domains for malicious activity via URLScan.io API.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('urlscan-validator')}
-                  disabled={loading['urlscan-validator']}
-                  className="w-full"
-                >
-                  {loading['urlscan-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run URLScan
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  HoneyDB Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate IPv4 against HoneyDB bad hosts
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Checks IPs against HoneyDB bad hosts database and assigns threat scores.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('honeydb-validator')}
-                  disabled={loading['honeydb-validator'] || runningAllValidators}
-                  className="w-full"
-                >
-                  {loading['honeydb-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                      {validatorProgress?.validator === 'honeydb-validator' && (
-                        <span className="ml-2 text-xs">
-                          ({validatorProgress.processed} / {validatorProgress.total})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run HoneyDB
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  NeutrinoAPI Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate IPs via NeutrinoAPI (Blocklist + 150 DNSBLs + IP Probe)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Checks IPs against NeutrinoAPI blocklist, 150+ DNSBLs, and performs deep IP analysis (VPN/Proxy/Hosting detection, ASN, geo).
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('neutrinoapi-validator')}
-                  disabled={loading['neutrinoapi-validator'] || runningAllValidators}
-                  className="w-full"
-                >
-                  {loading['neutrinoapi-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                      {validatorProgress?.validator === 'neutrinoapi-validator' && (
-                        <span className="ml-2 text-xs">
-                          ({validatorProgress.processed} / {validatorProgress.total})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run NeutrinoAPI
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  VirusTotal Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate indicators using VirusTotal API
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Queries VirusTotal for IPv4 and domain reputation data. Rate limited to 4 lookups/min, 500/day.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('virustotal-validator')}
-                  disabled={loading['virustotal-validator']}
-                  className="w-full"
-                >
-                  {loading['virustotal-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Validating...
-                      {validatorProgress && validatorProgress.validator === 'virustotal-validator' && (
-                        <span className="ml-2 text-xs">
-                          {validatorProgress.processed} / {validatorProgress.total}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run VirusTotal
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Source Health Check
-                </CardTitle>
-                <CardDescription>
-                  Check health of all ingest sources
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Tests connectivity for all sources and re-enables those that are back online.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('source-health-check')}
-                  disabled={loading['source-health-check']}
-                  className="w-full"
-                >
-                  {loading['source-health-check'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Check Sources
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  RIPEstat Enrichment
-                </CardTitle>
-                <CardDescription>
-                  Enrich indicators with geolocation and network data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Fetches geolocation, ASN, country, abuse contacts, and network info from RIPEstat for high-confidence indicators. No API key required.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('ripestat-enrich')}
-                  disabled={loading['ripestat-enrich']}
-                  className="w-full"
-                >
-                  {loading['ripestat-enrich'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Enriching...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Enrichment
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Cloudflare Radar Enrichment
-                </CardTitle>
-                <CardDescription>
-                  Enrich IPs with Cloudflare Radar BGP & geo data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Fetches ASN, country, and prefix data from Cloudflare Radar for IPv4 indicators.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('cloudflare-radar-enrich')}
-                  disabled={loading['cloudflare-radar-enrich']}
-                  className="w-full"
-                >
-                  {loading['cloudflare-radar-enrich'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Cloudflare Radar
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Cloudflare Radar Top 100K Sync
-                </CardTitle>
-                <CardDescription>
-                  Sync Top 100K domains whitelist from Cloudflare Radar
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Downloads and caches the Cloudflare Radar Top 100K domains for domain validation (7-day TTL).
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('cloudflare-radar-domains-sync')}
-                  disabled={loading['cloudflare-radar-domains-sync']}
-                  className="w-full"
-                >
-                  {loading['cloudflare-radar-domains-sync'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Sync Top 100K Domains
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Cloudflare Radar Domain Validator
-                </CardTitle>
-                <CardDescription>
-                  Validate domains against Top 100K whitelist
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Validates domains in dynamic_raw_indicators against the Cloudflare Radar Top 100K whitelist, setting confidence to 0 for whitelisted domains.
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('cloudflare-radar-domain-validator')}
-                  disabled={loading['cloudflare-radar-domain-validator']}
-                  className="w-full"
-                >
-                  {loading['cloudflare-radar-domain-validator'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Validating...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Domain Validation
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Admin Control Log Email
-                </CardTitle>
-                <CardDescription>
-                  Send test control log email to administrators
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Recipients: hsc.pisa@gmail.com, luca.salvatori.pisa@gmail.com
-                </div>
-                <Button
-                  onClick={() => testEdgeFunction('admin-control-log')}
-                  disabled={loading['admin-control-log']}
-                  className="w-full"
-                >
-                  {loading['admin-control-log'] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Sending Email...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Send Test Email
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </div>
         </TabsContent>
 
