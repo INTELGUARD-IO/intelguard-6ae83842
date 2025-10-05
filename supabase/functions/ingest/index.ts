@@ -82,6 +82,53 @@ async function* fetchTextStream(url: string, timeoutMs = 120000): AsyncGenerator
   }
 }
 
+// JSON processing for CleanTalk and AlienVault sources
+async function parseJSONResponse(url: string, timeoutMs: number): Promise<string[]> {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      headers: { 
+        'User-Agent': 'intelguard/ingest/1.0',
+        'Accept-Encoding': 'gzip, deflate'
+      },
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    
+    const text = await r.text();
+    
+    // CleanTalk format: {"data":{"networks":[{"ip":"1.2.3.4"}]}}
+    if (url.includes('cleantalk.org')) {
+      try {
+        const json = JSON.parse(text);
+        if (json.data?.networks && Array.isArray(json.data.networks)) {
+          return json.data.networks
+            .map((n: any) => n.ip)
+            .filter((ip: string) => ip && typeof ip === 'string');
+        }
+      } catch (e) {
+        console.error('[parseJSON] CleanTalk parse error:', e);
+        return [];
+      }
+    }
+    
+    // AlienVault CSV-like: "1.2.3.4",category,score\n
+    if (url.includes('alienvault.com')) {
+      return text.split('\n')
+        .map(line => {
+          const firstCol = line.split(',')[0];
+          return firstCol ? firstCol.replace(/"/g, '').trim() : '';
+        })
+        .filter(ip => ip.length > 0);
+    }
+    
+    return [];
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // Process a single line and return indicator if valid
 function normalizeLine(
   line: string,
@@ -241,50 +288,105 @@ Deno.serve(async (req) => {
           .update({ last_run: nowIso, last_attempt: nowIso })
           .eq('id', source.id);
         
-        for await (const line of fetchTextStream(source.url, 180000)) {
-          const normalized = normalizeLine(line, source.kind, source.url);
-          if (!normalized) continue;
+        // Detect JSON sources by URL pattern
+        const isJSONSource = source.url.includes('cleantalk.org') || source.url.includes('alienvault.com');
+        
+        if (isJSONSource) {
+          // Fetch JSON and process all IPs at once
+          console.log(`[ingest] Detected JSON source: ${source.name}`);
+          const ips = await parseJSONResponse(source.url, 180000);
+          console.log(`[ingest] JSON parsed: ${ips.length} raw entries`);
           
-          const key = `${normalized.indicator}||${normalized.source}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          
-          batchBuffer.push(normalized);
-          sourceCount++;
-          
-          if (batchBuffer.length >= BATCH_SIZE) {
-            batchNumber++;
-            const upsertTime = new Date().toISOString();
+          for (const ip of ips) {
+            const normalized = normalizeLine(ip, source.kind, source.url);
+            if (!normalized) continue;
             
-            const toInsert = batchBuffer.map((r) => ({
-              indicator: r.indicator,
-              kind: r.kind,
-              source: r.source,
-              first_seen: upsertTime,
-              last_seen: upsertTime,
-            }));
+            const key = `${normalized.indicator}||${normalized.source}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
             
-            // Upsert handles both INSERT and UPDATE of last_seen automatically
-            const { error: insErr } = await supabase
-              .from('raw_indicators')
-              .upsert(toInsert, { onConflict: 'indicator,source' });
+            batchBuffer.push(normalized);
+            sourceCount++;
             
-            if (insErr) {
-              console.error('[ingest] Batch upsert error:', insErr);
-              throw insErr;
+            if (batchBuffer.length >= BATCH_SIZE) {
+              batchNumber++;
+              const upsertTime = new Date().toISOString();
+              
+              const toInsert = batchBuffer.map((r) => ({
+                indicator: r.indicator,
+                kind: r.kind,
+                source: r.source,
+                first_seen: upsertTime,
+                last_seen: upsertTime,
+              }));
+              
+              const { error: insErr } = await supabase
+                .from('raw_indicators')
+                .upsert(toInsert, { onConflict: 'indicator,source' });
+              
+              if (insErr) {
+                console.error('[ingest] Batch upsert error:', insErr);
+                throw insErr;
+              }
+              
+              totalProcessed += batchBuffer.length;
+              const elapsed = Date.now() - startTime;
+              const rate = (sourceCount / (elapsed / 1000)).toFixed(0);
+              console.log(`[ingest] ${source.name}: ${sourceCount} indicators (batch ${batchNumber}, ${rate}/sec)`);
+              
+              batchBuffer = [];
+              
+              if (batchNumber % 10 === 0) {
+                seen.clear();
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
             }
+          }
+        } else {
+          // Existing TXT streaming logic
+          for await (const line of fetchTextStream(source.url, 180000)) {
+            const normalized = normalizeLine(line, source.kind, source.url);
+            if (!normalized) continue;
             
-            totalProcessed += batchBuffer.length;
-            const elapsed = Date.now() - startTime;
-            const rate = (sourceCount / (elapsed / 1000)).toFixed(0);
-            console.log(`[ingest] ${source.name}: ${sourceCount} indicators (batch ${batchNumber}, ${rate}/sec)`);
+            const key = `${normalized.indicator}||${normalized.source}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
             
-            batchBuffer = [];
+            batchBuffer.push(normalized);
+            sourceCount++;
             
-            // Memory management: clear dedup set every 10 batches
-            if (batchNumber % 10 === 0) {
-              seen.clear();
-              await new Promise(resolve => setTimeout(resolve, 10));
+            if (batchBuffer.length >= BATCH_SIZE) {
+              batchNumber++;
+              const upsertTime = new Date().toISOString();
+              
+              const toInsert = batchBuffer.map((r) => ({
+                indicator: r.indicator,
+                kind: r.kind,
+                source: r.source,
+                first_seen: upsertTime,
+                last_seen: upsertTime,
+              }));
+              
+              const { error: insErr } = await supabase
+                .from('raw_indicators')
+                .upsert(toInsert, { onConflict: 'indicator,source' });
+              
+              if (insErr) {
+                console.error('[ingest] Batch upsert error:', insErr);
+                throw insErr;
+              }
+              
+              totalProcessed += batchBuffer.length;
+              const elapsed = Date.now() - startTime;
+              const rate = (sourceCount / (elapsed / 1000)).toFixed(0);
+              console.log(`[ingest] ${source.name}: ${sourceCount} indicators (batch ${batchNumber}, ${rate}/sec)`);
+              
+              batchBuffer = [];
+              
+              if (batchNumber % 10 === 0) {
+                seen.clear();
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
             }
           }
         }
