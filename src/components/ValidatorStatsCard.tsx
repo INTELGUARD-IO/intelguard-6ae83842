@@ -143,7 +143,9 @@ export const ValidatorStatsCard = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{validator.name}</span>
                   <Badge variant={detectionRate > 10 ? 'destructive' : detectionRate > 5 ? 'secondary' : 'outline'}>
-                    {detectionRate.toFixed(1)}%
+                    {detectionRate >= 10 
+                      ? `${Math.round(detectionRate)}%` 
+                      : `${detectionRate.toFixed(1)}%`}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
