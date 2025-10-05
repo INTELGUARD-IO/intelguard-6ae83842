@@ -402,22 +402,28 @@ async function processIndicators() {
       cached++;
     }
 
-    // Update dynamic_raw_indicators
+    // Use stored procedure to merge sources atomically
     if (enrichment) {
+      const newConfidence = enrichment.score >= 70 
+        ? Math.min(100, (ind.confidence || 50) + 20) 
+        : Math.max(0, (ind.confidence || 50) - 10);
+
       await supabaseQuery(
         SUPABASE_URL,
         SUPABASE_SERVICE_KEY,
-        'dynamic_raw_indicators',
-        'PATCH',
+        'rpc/merge_validator_result',
+        'POST',
         {
-          otx_checked: true,
-          otx_score: enrichment.score,
-          otx_verdict: enrichment.verdict,
-          confidence: enrichment.score >= 70 
-            ? Math.min(100, (ind.confidence || 50) + 20) 
-            : Math.max(0, (ind.confidence || 50) - 10)
-        },
-        `?indicator=eq.${encodeURIComponent(indicator)}&kind=eq.${kind}`
+          p_indicator: indicator,
+          p_kind: kind,
+          p_new_source: 'otx',
+          p_confidence: newConfidence,
+          p_validator_fields: {
+            otx_checked: true,
+            otx_score: enrichment.score,
+            otx_verdict: enrichment.verdict
+          }
+        }
       );
     }
   }

@@ -324,8 +324,8 @@ Deno.serve(async (req) => {
           console.warn(`IP probe failed for ${ip}: ${ipProbeResponse.status}`);
         }
 
-        // Update dynamic_raw_indicators with enhanced metadata
-        const updateData = {
+        // Use stored procedure to merge sources atomically
+        const validatorFields = {
           neutrinoapi_checked: true,
           neutrinoapi_in_blocklist: inBlocklist && inBlocklist.length > 0,
           neutrinoapi_host_reputation_score: hostRep ? (hostRep['list-count'] || 0) * 10 : null,
@@ -333,39 +333,39 @@ Deno.serve(async (req) => {
           neutrinoapi_is_vpn: ipProbe ? ipProbe['is-vpn'] : null,
           neutrinoapi_is_hosting: ipProbe ? ipProbe['is-hosting'] : null,
           neutrinoapi_metadata: {
-            // VPN/Proxy/Hosting details
             vpn_domain: ipProbe?.['vpn-domain'] || null,
             provider_type: ipProbe?.['provider-type'] || null,
             is_bogon: ipProbe?.['is-bogon'] || null,
-            // Network information
             asn: ipProbe?.asn || null,
             as_cidr: ipProbe?.['as-cidr'] || null,
             as_description: ipProbe?.['as-description'] || null,
             provider_description: ipProbe?.['provider-description'] || null,
             hostname: ipProbe?.hostname || null,
-            // Geolocation
             country: ipProbe?.country || null,
             country_code: ipProbe?.['country-code'] || null,
             city: ipProbe?.city || null,
             region: ipProbe?.region || null,
-            // Host reputation details
             host_reputation: hostRep ? {
               is_listed: hostRep['is-listed'],
               list_count: hostRep['list-count'],
               zones: hostRep.zones || [],
               lists: hostRep.lists || null
             } : null,
-          },
-          last_validated: new Date().toISOString(),
+          }
         };
 
         await supabaseQuery(
           supabaseUrl,
           supabaseServiceKey,
-          'dynamic_raw_indicators',
-          'PATCH',
-          updateData,
-          `?indicator=eq.${ip}&kind=eq.ipv4`
+          'rpc/merge_validator_result',
+          'POST',
+          {
+            p_indicator: ip,
+            p_kind: 'ipv4',
+            p_new_source: 'neutrinoapi',
+            p_confidence: 60, // Default confidence for neutrinoapi
+            p_validator_fields: validatorFields
+          }
         );
 
         validated++;

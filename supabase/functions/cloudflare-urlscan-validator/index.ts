@@ -284,17 +284,20 @@ Deno.serve(async (req) => {
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           });
 
-        // Update dynamic_raw_indicators
-        await supabase
-          .from('dynamic_raw_indicators')
-          .update({
+        // Use stored procedure to merge sources atomically
+        await supabase.rpc('merge_validator_result', {
+          p_indicator: domain.indicator,
+          p_kind: 'domain',
+          p_new_source: 'cloudflare_urlscan',
+          p_confidence: 60, // Default confidence for cloudflare urlscan
+          p_validator_fields: {
             cloudflare_urlscan_checked: true,
             cloudflare_urlscan_score: score,
             cloudflare_urlscan_malicious: malicious,
             cloudflare_urlscan_categories: categories,
-            cloudflare_urlscan_verdict: verdict,
-          })
-          .eq('id', domain.id);
+            cloudflare_urlscan_verdict: verdict
+          }
+        });
 
         scanned++;
 

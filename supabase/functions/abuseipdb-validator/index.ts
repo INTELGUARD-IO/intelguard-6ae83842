@@ -262,19 +262,17 @@ async function processIndicators(supabase: any, indicators: any[]) {
         continue;
       }
 
-      const { error: upsertError } = await supabase
-        .from('dynamic_raw_indicators')
-        .upsert({
-          indicator: indicator.indicator,
-          kind: indicator.kind,
-          confidence,
-          sources: indicator.sources,
-          source_count: indicator.source_count,
-          last_validated: new Date().toISOString(),
+      const { error: upsertError } = await supabase.rpc('merge_validator_result', {
+        p_indicator: indicator.indicator,
+        p_kind: indicator.kind,
+        p_new_source: 'abuseipdb',
+        p_confidence: confidence,
+        p_validator_fields: {
           abuseipdb_checked: true,
           abuseipdb_score: abuseScore,
-          abuseipdb_in_blacklist: inBlacklist,
-        }, { onConflict: 'indicator,kind' });
+          abuseipdb_in_blacklist: inBlacklist
+        }
+      });
 
       if (upsertError) {
         console.error(`[ABUSEIPDB] Error upserting ${indicator.indicator}:`, upsertError);

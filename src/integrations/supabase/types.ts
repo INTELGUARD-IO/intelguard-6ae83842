@@ -1548,6 +1548,16 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      merge_validator_result: {
+        Args: {
+          p_confidence: number
+          p_indicator: string
+          p_kind: string
+          p_new_source: string
+          p_validator_fields?: Json
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

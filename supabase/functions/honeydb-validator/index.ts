@@ -151,26 +151,31 @@ Deno.serve(async (req) => {
       const isInBlacklist = badIpMap.has(candidate.indicator);
       const threatScore = isInBlacklist ? badIpMap.get(candidate.indicator)! : null;
 
-      const updateBody = {
-        honeydb_checked: true,
-        honeydb_in_blacklist: isInBlacklist,
-        honeydb_threat_score: threatScore,
-      };
-
-      const updateResponse = await fetch(
-        `${supabaseUrl}/rest/v1/dynamic_raw_indicators?id=eq.${candidate.id}`,
+      // Use stored procedure to merge sources atomically
+      const rpcResponse = await fetch(
+        `${supabaseUrl}/rest/v1/rpc/merge_validator_result`,
         {
-          method: 'PATCH',
+          method: 'POST',
           headers: {
             'apikey': supabaseServiceKey,
             'Authorization': `Bearer ${supabaseServiceKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(updateBody),
+          body: JSON.stringify({
+            p_indicator: candidate.indicator,
+            p_kind: candidate.kind,
+            p_new_source: 'honeydb',
+            p_confidence: 60,
+            p_validator_fields: {
+              honeydb_checked: true,
+              honeydb_in_blacklist: isInBlacklist,
+              honeydb_threat_score: threatScore
+            }
+          }),
         }
       );
 
-      if (updateResponse.ok) {
+      if (rpcResponse.ok) {
         updated++;
         if (isInBlacklist) {
           console.log(`✓ ${candidate.indicator} - Found in HoneyDB (score: ${threatScore})`);

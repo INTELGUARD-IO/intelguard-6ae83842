@@ -396,18 +396,23 @@ Deno.serve(async (req) => {
           }
         );
 
-        // Update dynamic_raw_indicators
+        // Use stored procedure to merge sources atomically
         await supabaseQuery(
           supabaseUrl,
           supabaseServiceKey,
-          'dynamic_raw_indicators',
-          'PATCH',
+          'rpc/merge_validator_result',
+          'POST',
           {
-            virustotal_checked: true,
-            virustotal_score: score,
-            virustotal_malicious: isMalicious,
-          },
-          `?indicator=eq.${encodeURIComponent(indicator)}&kind=eq.${kind}`
+            p_indicator: indicator,
+            p_kind: kind,
+            p_new_source: 'virustotal',
+            p_confidence: 60, // Default confidence for virustotal
+            p_validator_fields: {
+              virustotal_checked: true,
+              virustotal_score: score,
+              virustotal_malicious: isMalicious
+            }
+          }
         );
 
         processed++;

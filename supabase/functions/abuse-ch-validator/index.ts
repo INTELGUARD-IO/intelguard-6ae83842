@@ -199,21 +199,17 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Insert into dynamic_raw_indicators
-      const { error: insertError } = await supabase
-        .from('dynamic_raw_indicators')
-        .upsert({
-          indicator: ind.indicator,
-          kind: ind.kind,
-          confidence,
-          sources: Array.from(ind.sources),
-          source_count: sourceCount,
-          last_validated: new Date().toISOString(),
+      // Use stored procedure to merge sources atomically
+      const { error: insertError } = await supabase.rpc('merge_validator_result', {
+        p_indicator: ind.indicator,
+        p_kind: ind.kind,
+        p_new_source: 'abuse.ch',
+        p_confidence: confidence,
+        p_validator_fields: {
           abuse_ch_checked: true,
           abuse_ch_is_fp: false
-        }, {
-          onConflict: 'indicator,kind'
-        });
+        }
+      });
 
       if (insertError) {
         console.error(`[ABUSE-CH] Error inserting ${ind.indicator}:`, insertError);

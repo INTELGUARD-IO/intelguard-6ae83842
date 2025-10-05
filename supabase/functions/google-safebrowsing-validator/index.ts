@@ -356,16 +356,18 @@ Deno.serve(async (req) => {
           raw: matches.length > 0 ? { matches, verdict } : null,
         });
 
-        // Update dynamic_raw_indicators
-        await supabase
-          .from('dynamic_raw_indicators')
-          .update({
+        // Use stored procedure to merge sources atomically
+        await supabase.rpc('merge_validator_result', {
+          p_indicator: candidate.indicator,
+          p_kind: candidate.kind,
+          p_new_source: 'google_safebrowsing',
+          p_confidence: 60, // Default confidence for safebrowsing validator
+          p_validator_fields: {
             safebrowsing_checked: true,
             safebrowsing_score: score,
-            safebrowsing_verdict: verdict,
-          })
-          .eq('indicator', candidate.indicator)
-          .eq('kind', candidate.kind);
+            safebrowsing_verdict: verdict
+          }
+        });
 
         indicatorsProcessed.add(indicatorKey);
         totalProcessed++;

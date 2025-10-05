@@ -47,7 +47,7 @@ export default function Indicators() {
       const { data, error } = await supabase
         .from('public_threat_indicators')
         .select('*')
-        .gt('sources_count', 1)
+        .gte('sources_count', 1)
         .order('last_seen', { ascending: false })
         .limit(1000);
 

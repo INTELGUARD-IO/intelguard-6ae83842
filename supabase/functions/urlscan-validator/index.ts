@@ -327,19 +327,24 @@ Deno.serve(async (req) => {
           console.error(`[URLSCAN] Error storing vendor check for ${domain}:`, vendorError);
         }
 
-        // Update dynamic_raw_indicators
+        // Use stored procedure to merge sources atomically
         try {
           await supabaseQuery(
             supabaseUrl,
             supabaseServiceKey,
-            'dynamic_raw_indicators',
-            'PATCH',
+            'rpc/merge_validator_result',
+            'POST',
             {
-              urlscan_checked: true,
-              urlscan_score: maliciousScore,
-              urlscan_malicious: isMalicious,
-            },
-            `?indicator=eq.${encodeURIComponent(domain)}&kind=eq.domain`
+              p_indicator: domain,
+              p_kind: 'domain',
+              p_new_source: 'urlscan',
+              p_confidence: 60, // Default confidence for urlscan
+              p_validator_fields: {
+                urlscan_checked: true,
+                urlscan_score: maliciousScore,
+                urlscan_malicious: isMalicious
+              }
+            }
           );
           validated++;
         } catch (updateError) {
