@@ -113,53 +113,50 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      // Parallel queries for raw and validated indicators
+      // Optimized: Use raw_indicator_stats_mv for counts (cached)
+      const { data: rawStatsArray } = await supabase.rpc('get_raw_indicator_stats');
+      const rawStats = rawStatsArray?.[0];
+      
+      // Batch 1: Critical counts (head-only, fast)
       const [
-        { count: rawIpv4Count },
-        { count: rawDomainCount },
         { data: enabledSourcesData },
         { count: validatedIpv4Count },
         { count: validatedDomainCount },
-        { data: deltaData },
+        { data: deltaData }
+      ] = await Promise.all([
+        supabase.from('ingest_sources').select('id').eq('enabled', true),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
+        supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2)
+      ]);
+      
+      // Batch 2: Enrichment data (with LIMIT to prevent timeouts)
+      const [
         { count: enrichedCount },
         { data: enrichedData },
         { count: bgpviewCount },
         { data: bgpviewData },
         { count: cfRadarCount },
-        { data: cfRadarData },
+        { data: cfRadarData }
+      ] = await Promise.all([
+        supabase.from('ripestat_enrichment').select('*', { count: 'exact', head: true }),
+        supabase.from('ripestat_enrichment').select('country_code').gt('expires_at', new Date().toISOString()).limit(10000),
+        supabase.from('bgpview_enrichment').select('*', { count: 'exact', head: true }),
+        supabase.from('bgpview_enrichment').select('ptr_record, country_code').gt('expires_at', new Date().toISOString()).limit(10000),
+        supabase.from('cloudflare_radar_enrichment').select('*', { count: 'exact', head: true }),
+        supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString()).limit(10000)
+      ]);
+      
+      // Batch 3: Validator stats (lightweight)
+      const [
         { count: whitelistedCount },
         { count: otxValidatedCount },
         { count: safeBrowsingValidatedCount },
         { count: safeBrowsingThreatsCount }
       ] = await Promise.all([
-        // Raw indicators from raw_indicators
-        supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4').is('removed_at', null),
-        supabase.from('raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').is('removed_at', null),
-        supabase.from('ingest_sources').select('*').eq('enabled', true),
-        // Validated indicators from dynamic_raw_indicators
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
-        // Daily deltas
-        supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2),
-        // RIPEstat enrichment count
-        supabase.from('ripestat_enrichment').select('*', { count: 'exact', head: true }),
-        // RIPEstat data for country stats
-        supabase.from('ripestat_enrichment').select('country_code').gt('expires_at', new Date().toISOString()),
-        // BGPview enrichment count
-        supabase.from('bgpview_enrichment').select('*', { count: 'exact', head: true }),
-        // BGPview data for PTR and country stats
-        supabase.from('bgpview_enrichment').select('ptr_record, country_code').gt('expires_at', new Date().toISOString()),
-        // Cloudflare Radar enrichment count
-        supabase.from('cloudflare_radar_enrichment').select('*', { count: 'exact', head: true }),
-        // Cloudflare Radar data for country stats
-        supabase.from('cloudflare_radar_enrichment').select('country_code').gt('expires_at', new Date().toISOString()),
-        // Whitelisted indicators (confidence = 0)
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('confidence', 0),
-        // OTX validated indicators
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain').eq('whitelisted', true),
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('otx_checked', true),
-        // Google Safe Browsing validated indicators
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('safebrowsing_checked', true),
-        // Google Safe Browsing threats detected (score >= 50)
         supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('safebrowsing_checked', true).gte('safebrowsing_score', 50)
       ]);
 
@@ -215,10 +212,10 @@ export default function Dashboard() {
         .map(([country]) => country);
 
       setStats({
-        rawTotal: (rawIpv4Count || 0) + (rawDomainCount || 0),
-        rawIpv4: rawIpv4Count || 0,
-        rawDomains: rawDomainCount || 0,
-        rawSources: activeSourcesCount,
+        rawTotal: rawStats?.total_count || 0,
+        rawIpv4: rawStats?.ipv4_count || 0,
+        rawDomains: rawStats?.domain_count || 0,
+        rawSources: enabledSourcesData?.length || 0,
         validatedTotal: (validatedIpv4Count || 0) + (validatedDomainCount || 0),
         validatedIpv4: validatedIpv4Count || 0,
         validatedDomains: validatedDomainCount || 0,
