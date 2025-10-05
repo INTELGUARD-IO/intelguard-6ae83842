@@ -84,17 +84,20 @@ export default function IngestSources() {
       const cacheTTL = 5 * 60 * 1000; // 5 minutes
       const cached = localStorage.getItem(cacheKey);
       
-      if (!forceRefresh && cached) {
+      // Always show cached data immediately if available
+      if (cached) {
         const { data: cachedData, timestamp } = JSON.parse(cached);
+        setRawIndicatorStats(cachedData);
+        
         const age = Date.now() - timestamp;
         
-        if (age < cacheTTL) {
-          setRawIndicatorStats(cachedData);
+        // If cache is fresh and not forcing refresh, skip fetch
+        if (!forceRefresh && age < cacheTTL) {
           return;
         }
       }
 
-      // Fetch fresh data
+      // Fetch fresh data in background if cache is stale or forced
       const { data, error } = await supabase
         .rpc('get_raw_indicator_stats' as any);
 
@@ -471,7 +474,7 @@ export default function IngestSources() {
                   <Badge variant="outline" className="mr-2">{rawIndicatorStats.sources} sources</Badge>
                 </>
               ) : (
-                <div className="h-5 w-20 bg-muted animate-pulse rounded" />
+                'Loading...'
               )}
             </CardDescription>
           </CardHeader>
@@ -480,7 +483,7 @@ export default function IngestSources() {
               {rawIndicatorStats ? (
                 rawIndicatorStats.total.toLocaleString()
               ) : (
-                <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+                '...'
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">

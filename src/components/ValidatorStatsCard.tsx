@@ -133,28 +133,31 @@ export const ValidatorStatsCard = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {validatorList.map(validator => {
             const data = stats[validator.key as keyof typeof stats];
             const detectionRate = data.checked > 0 ? ((data.malicious / data.checked) * 100) : 0;
             
             return (
-              <div key={validator.key} className="space-y-2 p-3 border rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{validator.name}</span>
-                  <Badge variant={detectionRate > 10 ? 'destructive' : detectionRate > 5 ? 'secondary' : 'outline'}>
+              <div key={validator.key} className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium whitespace-nowrap">{validator.name}</span>
+                  <Badge 
+                    variant={detectionRate > 10 ? 'destructive' : detectionRate > 5 ? 'secondary' : 'outline'}
+                    className="shrink-0"
+                  >
                     {detectionRate >= 10 
                       ? `${Math.round(detectionRate)}%` 
                       : `${detectionRate.toFixed(1)}%`}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span>{data.checked.toLocaleString()} checked</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <XCircle className="h-3 w-3 text-destructive" />
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <XCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
                     <span>{data.malicious.toLocaleString()} malicious</span>
                   </div>
                 </div>
