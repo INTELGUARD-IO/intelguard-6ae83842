@@ -248,6 +248,36 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_watchdog_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          id: string
+          jobid: number
+          jobname: string
+          runtime_minutes: number | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          jobid: number
+          jobname: string
+          runtime_minutes?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          jobid?: number
+          jobname?: string
+          runtime_minutes?: number | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -1660,6 +1690,10 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      manual_unstuck_job: {
+        Args: { p_jobname: string }
+        Returns: string
+      }
       merge_validator_result: {
         Args: {
           p_confidence: number
@@ -1693,6 +1727,16 @@ export type Database = {
       snapshot_validated_indicators_to_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      watchdog_check_stuck_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          action: string
+          jobid: number
+          jobname: string
+          message: string
+          runtime_minutes: number
+        }[]
       }
     }
     Enums: {
