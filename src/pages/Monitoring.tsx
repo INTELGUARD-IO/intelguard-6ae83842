@@ -182,51 +182,49 @@ const Monitoring = () => {
 
   const loadMetrics = async () => {
     try {
-      // Use RPC function to get raw indicators stats efficiently
-      const { data: statsData, error: statsError } = await supabase.rpc('get_raw_indicator_stats' as any);
+      // Direct count queries - more reliable and faster than RPC
+      console.log('📊 Loading raw indicators count...');
       
-      if (statsError) {
-        console.error('❌ Error calling get_raw_indicator_stats:', statsError);
+      // Total raw indicators count
+      const { count: totalCount, error: totalError } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .is('removed_at', null);
+      
+      if (totalError) {
+        console.error('❌ Error loading raw indicators count:', totalError);
         toast({
           title: "Errore caricamento Raw Indicators",
-          description: statsError.message,
+          description: totalError.message,
           variant: "destructive",
         });
-        
-        // Fallback: direct count query
-        console.log('🔄 Attempting fallback direct count query...');
-        const { count: directCount, error: countError } = await supabase
-          .from('raw_indicators')
-          .select('*', { count: 'exact', head: true })
-          .is('removed_at', null);
-        
-        if (!countError) {
-          console.log('✅ Fallback successful. Raw indicators count:', directCount);
-          setRawIndicators(directCount || 0);
-        } else {
-          console.error('❌ Fallback query failed:', countError);
-        }
+        setRawIndicators(0);
       } else {
-        console.log('📊 Raw indicator stats from RPC:', statsData);
-        
-        if (statsData && statsData.length > 0) {
-          const stats = statsData[0];
-          const rawCount = Number(stats.total_count) || 0;
-          console.log('🔢 Setting rawIndicators to:', rawCount);
-          setRawIndicators(rawCount);
-          
-          // Indicators by type from RPC
-          const typeCounts = [
-            { label: 'ipv4', value: Number(stats.ipv4_count) || 0 },
-            { label: 'domain', value: Number(stats.domain_count) || 0 }
-          ].filter(item => item.value > 0);
-          console.log('📈 Indicators by type:', typeCounts);
-          setIndicatorsByType(typeCounts);
-        } else {
-          console.warn('⚠️ No data returned from get_raw_indicator_stats');
-          setRawIndicators(0);
-        }
+        console.log('✅ Raw indicators count:', totalCount);
+        setRawIndicators(totalCount || 0);
       }
+      
+      // Count by type (IPv4)
+      const { count: ipv4Count } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .is('removed_at', null)
+        .eq('kind', 'ipv4');
+      
+      // Count by type (Domain)
+      const { count: domainCount } = await supabase
+        .from('raw_indicators')
+        .select('*', { count: 'exact', head: true })
+        .is('removed_at', null)
+        .eq('kind', 'domain');
+      
+      const typeCounts = [
+        { label: 'ipv4', value: ipv4Count || 0 },
+        { label: 'domain', value: domainCount || 0 }
+      ].filter(item => item.value > 0);
+      
+      console.log('📈 Indicators by type:', typeCounts);
+      setIndicatorsByType(typeCounts);
 
       // Dynamic indicators count
       const { count: dynamicCount } = await supabase
