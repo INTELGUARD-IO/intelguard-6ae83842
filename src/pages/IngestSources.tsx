@@ -135,6 +135,7 @@ export default function IngestSources() {
       }));
     } catch (error) {
       console.error('Error loading raw indicator stats:', error);
+      toast.error('Failed to load database statistics. Please try again.');
     }
   }
 
@@ -500,13 +501,9 @@ export default function IngestSources() {
           <CardHeader>
             <CardTitle>Database Raw Indicators</CardTitle>
             <CardDescription>
-              {rawIndicatorStats ? (
-                <>
-                  <Badge variant="outline" className="mr-2">{rawIndicatorStats.sources} sources</Badge>
-                </>
-              ) : (
-                'Loading...'
-              )}
+              <Badge variant="outline" className="mr-2">
+                {rawIndicatorStats ? `${rawIndicatorStats.sources} sources` : 'Loading sources...'}
+              </Badge>
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1361,6 +1361,18 @@ export type Database = {
         }
         Relationships: []
       }
+      raw_indicator_stats_mv: {
+        Row: {
+          domain_count: number | null
+          ipv4_count: number | null
+          last_updated: string | null
+          total_count: number | null
+          unique_domain_count: number | null
+          unique_ipv4_count: number | null
+          unique_sources_count: number | null
+        }
+        Relationships: []
+      }
       validator_coverage: {
         Row: {
           abuseipdb_checked: number | null
