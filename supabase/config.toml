@@ -122,3 +122,6 @@ schedule = "0 * * * *"
 
 [functions.backfill-indicators]
 verify_jwt = false
+
+[functions.auto-start-domain-validation]
+verify_jwt = false

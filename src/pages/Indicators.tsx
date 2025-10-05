@@ -17,8 +17,6 @@ import {
 import { ValidatorStatsCard } from '@/components/ValidatorStatsCard';
 import { DomainValidatorStatus } from '@/components/DomainValidatorStatus';
 import { ValidatorCoverageWidget } from '@/components/ValidatorCoverageWidget';
-import { triggerDomainValidation } from '@/utils/triggerDomainValidation';
-import { toast } from 'sonner';
 
 interface Indicator {
   indicator: string;
@@ -94,18 +92,6 @@ export default function Indicators() {
     a.click();
   };
 
-  const handleTriggerValidation = async () => {
-    try {
-      toast.info('🚀 Avvio validazione domini prioritaria...');
-      await triggerDomainValidation();
-      toast.success('✅ Validazione avviata! I domini verranno processati nei prossimi minuti.');
-      setTimeout(() => loadIndicators(), 5000);
-    } catch (error) {
-      toast.error('❌ Errore durante l\'avvio della validazione');
-      console.error(error);
-    }
-  };
-
   const exportDomains = () => {
     const domainIndicators = indicators.filter(ind => ind.kind === 'domain');
     
@@ -145,9 +131,6 @@ export default function Indicators() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleTriggerValidation} variant="default" size="sm">
-            🚀 Valida Domini
-          </Button>
           <Button onClick={exportIPv4} variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export IPv4
