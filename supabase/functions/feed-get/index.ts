@@ -1,14 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { createPerfTracker, addPerfHeaders } from '../_shared/perf-logger.ts';
+import { feedCache } from '../_shared/feed-cache.ts';
+import { serializeToText } from '../_shared/serializers.ts';
+import { rateLimiter } from '../_shared/rate-limiter.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const perf = createPerfTracker('feed-get', 'GET');
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -59,16 +61,19 @@ Deno.serve(async (req) => {
 
     console.log(`[feed-get] Valid token - type: ${feedToken.type}`);
 
-    // TODO: Implement rate limiting
-    // Approach 1: Query feed_access_logs for recent accesses
-    //   - Count accesses from this token in last hour/day
-    //   - Store rate_limit in feed_tokens table
-    //   - Reject if exceeded
-    //
-    // Approach 2: Use Redis/Upstash for distributed rate limiting
-    //   - Store: `rate:${token}` with TTL
-    //   - Increment on each access
-    //   - Reject if > threshold
+    // Rate limiting
+    const rateCheck = rateLimiter.checkLimit(token);
+    if (!rateCheck.allowed) {
+      console.log(`[feed-get] Rate limit exceeded for token: ${token}`);
+      perf.logPerf(429);
+      
+      const rateLimitHeaders = rateLimiter.getRateLimitHeaders(rateCheck);
+      
+      return new Response('Rate limit exceeded. Please wait before retrying.', {
+        status: 429,
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'text/plain' }
+      });
+    }
 
     // Extract client info for logging
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
@@ -92,15 +97,37 @@ Deno.serve(async (req) => {
     // Map type to database kind
     const kind = type === 'domains' ? 'domain' : 'ipv4';
 
-    // Fetch indicators from validated_indicators
-    const { data: indicators, error: indicatorsError } = await supabase
-      .from('validated_indicators')
-      .select('indicator')
-      .eq('kind', kind)
-      .order('indicator', { ascending: true });
+    // Layer 1: Check in-memory cache
+    const cacheKey = feedCache.generateKey({ kind, format, token });
+    const cachedData = perf.trackCache(() => feedCache.get<string>(cacheKey));
+
+    if (cachedData) {
+      console.log('[feed-get] [CACHE HIT]', { kind, format });
+      const timings = perf.logPerf(200);
+      
+      const rateLimitHeaders = rateLimiter.getRateLimitHeaders(rateCheck);
+      const headers = new Headers({
+        ...corsHeaders,
+        ...rateLimitHeaders,
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        'X-Cache-Status': 'HIT'
+      });
+      
+      addPerfHeaders(headers, perf.requestId, timings.total);
+      
+      return new Response(cachedData, { status: 200, headers });
+    }
+
+    // Layer 2: Fetch from DB cache
+    console.log('[feed-get] [CACHE MISS] Fetching from DB cache...');
+    const { data: indicators, error: indicatorsError } = await perf.trackDbQuery(async () => {
+      return await supabase.rpc('get_feed_indicators', { p_kind: kind });
+    });
 
     if (indicatorsError) {
       console.error('[feed-get] Error fetching indicators:', indicatorsError);
+      perf.logPerf(500);
       return new Response('Internal error', {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
@@ -109,22 +136,34 @@ Deno.serve(async (req) => {
 
     console.log(`[feed-get] Returning ${indicators?.length || 0} indicators`);
 
-    // Format response as text with one indicator per line + trailing newline
-    const feedText = indicators && indicators.length > 0
-      ? indicators.map((i: { indicator: string }) => i.indicator).join('\n') + '\n'
-      : '\n';
-
-    return new Response(feedText, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'public, max-age=300' // 5 minutes
-      }
+    // Serialize
+    const feedText = perf.trackSerialization(() => {
+      return indicators && indicators.length > 0
+        ? serializeToText(indicators.map((i: { indicator: string }) => i.indicator))
+        : '\n';
     });
+
+    // Store in cache
+    feedCache.set(cacheKey, feedText);
+
+    const timings = perf.logPerf(200);
+
+    const rateLimitHeaders = rateLimiter.getRateLimitHeaders(rateCheck);
+    const headers = new Headers({
+      ...corsHeaders,
+      ...rateLimitHeaders,
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+      'X-Cache-Status': 'MISS'
+    });
+    
+    addPerfHeaders(headers, perf.requestId, timings.total);
+
+    return new Response(feedText, { status: 200, headers });
 
   } catch (error) {
     console.error('[feed-get] Unexpected error:', error);
+    perf.logPerf(500);
     return new Response('Internal server error', {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'text/plain' }

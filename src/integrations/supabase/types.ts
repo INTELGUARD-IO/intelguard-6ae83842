@@ -1410,6 +1410,15 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_stats_mv: {
+        Row: {
+          asn_count: number | null
+          countries_count: number | null
+          kind: string | null
+          validated_count: number | null
+        }
+        Relationships: []
+      }
       enrichment_summary: {
         Row: {
           asn: string | null
@@ -1595,6 +1604,33 @@ export type Database = {
           id: string
           month: string
           remaining_calls: number
+        }[]
+      }
+      get_dashboard_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          asn_count: number
+          countries_count: number
+          kind: string
+          validated_count: number
+        }[]
+      }
+      get_feed_indicators: {
+        Args: { p_kind: string; p_snapshot_hour?: number }
+        Returns: {
+          indicator: string
+        }[]
+      }
+      get_paginated_indicators: {
+        Args: { p_kind?: string; p_limit?: number; p_page?: number }
+        Returns: {
+          asn: string
+          confidence: number
+          country: string
+          indicator: string
+          kind: string
+          last_validated: string
+          threat_type: string
         }[]
       }
       get_raw_indicator_stats: {

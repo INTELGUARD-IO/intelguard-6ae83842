@@ -75,7 +75,9 @@ export default function Dashboard() {
     loadStats();
   }, []);
 
+  // Debounced functions for better UX
   const syncWhitelist = async () => {
+    if (syncingWhitelist) return;
     setSyncingWhitelist(true);
     try {
       toast.info('🔄 Syncing Top 100K domains from Cloudflare Radar...');
@@ -84,7 +86,8 @@ export default function Dashboard() {
       if (error) throw error;
       
       toast.success('✅ Top 100K domains synced successfully!');
-      await loadStats(); // Reload stats
+      // Debounce reload to avoid multiple quick calls
+      setTimeout(loadStats, 1000);
     } catch (error: any) {
       console.error('Sync error:', error);
       toast.error(`❌ Sync failed: ${error.message}`);
@@ -94,6 +97,7 @@ export default function Dashboard() {
   };
 
   const validateDomains = async () => {
+    if (validatingDomains) return;
     setValidatingDomains(true);
     try {
       toast.info('🔍 Running domain validation against whitelist...');
@@ -102,7 +106,7 @@ export default function Dashboard() {
       if (error) throw error;
       
       toast.success('✅ Domain validation completed!');
-      await loadStats(); // Reload stats
+      setTimeout(loadStats, 1000);
     } catch (error: any) {
       console.error('Validation error:', error);
       toast.error(`❌ Validation failed: ${error.message}`);
@@ -113,22 +117,22 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      // Optimized: Use raw_indicator_stats_mv for counts (cached)
-      const { data: rawStatsArray } = await supabase.rpc('get_raw_indicator_stats');
-      const rawStats = rawStatsArray?.[0];
-      
-      // Batch 1: Critical counts (head-only, fast)
+      // Batch 1: Use optimized RPCs for dashboard stats
       const [
+        { data: rawStatsArray },
+        { data: dashboardStatsArray },
         { data: enabledSourcesData },
-        { count: validatedIpv4Count },
-        { count: validatedDomainCount },
         { data: deltaData }
       ] = await Promise.all([
+        supabase.rpc('get_raw_indicator_stats'),
+        supabase.rpc('get_dashboard_stats'),
         supabase.from('ingest_sources').select('id').eq('enabled', true),
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'ipv4'),
-        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('kind', 'domain'),
         supabase.from('daily_deltas').select('*').order('run_date', { ascending: false }).limit(2)
       ]);
+      
+      const rawStats = rawStatsArray?.[0];
+      const ipv4Stats = dashboardStatsArray?.find((s: any) => s.kind === 'ipv4');
+      const domainStats = dashboardStatsArray?.find((s: any) => s.kind === 'domain');
       
       // Batch 2: Enrichment data (with LIMIT to prevent timeouts)
       const [
@@ -216,9 +220,9 @@ export default function Dashboard() {
         rawIpv4: rawStats?.ipv4_count || 0,
         rawDomains: rawStats?.domain_count || 0,
         rawSources: enabledSourcesData?.length || 0,
-        validatedTotal: (validatedIpv4Count || 0) + (validatedDomainCount || 0),
-        validatedIpv4: validatedIpv4Count || 0,
-        validatedDomains: validatedDomainCount || 0,
+        validatedTotal: (ipv4Stats?.validated_count || 0) + (domainStats?.validated_count || 0),
+        validatedIpv4: ipv4Stats?.validated_count || 0,
+        validatedDomains: domainStats?.validated_count || 0,
         recentDelta,
         enrichedCount: enrichedCount || 0,
         topCountries,

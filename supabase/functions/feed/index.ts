@@ -1,9 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { createPerfTracker, addPerfHeaders } from '../_shared/perf-logger.ts';
+import { feedCache } from '../_shared/feed-cache.ts';
+import { serializeToText } from '../_shared/serializers.ts';
 
 interface FeedToken {
   id: string;
@@ -13,16 +12,14 @@ interface FeedToken {
   tenant_id: string | null;
 }
 
-interface ValidatedIndicator {
-  indicator: string;
-  kind: string;
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Performance tracking
+  const perf = createPerfTracker('feed', 'GET');
 
   try {
     // Create Supabase client with service role (bypasses RLS)
@@ -96,15 +93,36 @@ Deno.serve(async (req) => {
     // Map type to database kind
     const kind = type === 'domains' ? 'domain' : 'ipv4';
 
-    // Fetch indicators from validated_indicators
-    const { data: indicators, error: indicatorsError } = await supabase
-      .from('validated_indicators')
-      .select('indicator, kind')
-      .eq('kind', kind)
-      .order('indicator', { ascending: true });
+    // Layer 1: Check in-memory cache
+    const cacheKey = feedCache.generateKey({ kind, format });
+    const cachedData = perf.trackCache(() => feedCache.get<string>(cacheKey));
+
+    if (cachedData) {
+      console.log('[CACHE HIT]', { kind, format });
+      const timings = perf.logPerf(200);
+      
+      const headers = new Headers({
+        ...corsHeaders,
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        'ETag': `"${kind}-${new Date().getHours()}"`,
+        'X-Cache-Status': 'HIT'
+      });
+      
+      addPerfHeaders(headers, perf.requestId, timings.total);
+      
+      return new Response(cachedData, { status: 200, headers });
+    }
+
+    // Layer 2: Fetch from DB cache via optimized RPC
+    console.log('[CACHE MISS] Fetching from DB cache...');
+    const { data: indicators, error: indicatorsError } = await perf.trackDbQuery(async () => {
+      return await supabase.rpc('get_feed_indicators', { p_kind: kind });
+    });
 
     if (indicatorsError) {
       console.error('Error fetching indicators:', indicatorsError);
+      perf.logPerf(500);
       return new Response('Internal error', {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
@@ -113,28 +131,34 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${indicators?.length || 0} indicators of type ${kind}`);
 
-    // Format response as text with one indicator per line
-    const feedText = indicators
-      ? indicators.map((i: ValidatedIndicator) => i.indicator).join('\n') + '\n'
-      : '\n';
-
-    // TODO: Implement rate-limiting based on token
-    // Could use a combination of:
-    // - Redis/Upstash for distributed rate limiting
-    // - Query feed_access_logs to count recent accesses
-    // - Store rate limit config in feed_tokens table
-
-    return new Response(feedText, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
-      }
+    // Serialize with optimized serializer
+    const feedText = perf.trackSerialization(() => {
+      return indicators && indicators.length > 0
+        ? serializeToText(indicators.map((i: { indicator: string }) => i.indicator))
+        : '\n';
     });
+
+    // Store in cache
+    feedCache.set(cacheKey, feedText);
+
+    const timings = perf.logPerf(200);
+
+    const headers = new Headers({
+      ...corsHeaders,
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+      'ETag': `"${kind}-${new Date().getHours()}"`,
+      'Last-Modified': new Date().toUTCString(),
+      'X-Cache-Status': 'MISS'
+    });
+    
+    addPerfHeaders(headers, perf.requestId, timings.total);
+
+    return new Response(feedText, { status: 200, headers });
 
   } catch (error) {
     console.error('Unexpected error:', error);
+    perf.logPerf(500);
     return new Response('Internal server error', {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'text/plain' }

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Download, Filter } from 'lucide-react';
+import { Search, Download, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -36,22 +36,47 @@ export default function Indicators() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 100;
+
+  // Debounce search input (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1); // Reset to first page on search
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadIndicators();
-  }, []);
+  }, [page, debouncedSearch]);
 
   const loadIndicators = async () => {
     setLoading(true);
     try {
+      // Use server-side pagination RPC
       const { data, error } = await supabase
-        .from('public_threat_indicators')
-        .select('*')
-        .order('last_seen', { ascending: false })
-        .limit(500);
+        .rpc('get_paginated_indicators', {
+          p_kind: null,
+          p_page: page,
+          p_limit: pageSize
+        });
 
       if (error) throw error;
-      setIndicators(data || []);
+      
+      const mappedData = (data || []).map((ind: any) => ({
+        ...ind,
+        first_seen: ind.last_validated,
+        last_seen: ind.last_validated,
+        sources_count: 1
+      }));
+      
+      setIndicators(mappedData);
+      setTotalCount(data?.length || 0);
     } catch (error) {
       console.error('Error loading indicators:', error);
     } finally {
@@ -59,9 +84,15 @@ export default function Indicators() {
     }
   };
 
-  const filteredIndicators = indicators.filter(ind =>
-    ind.indicator.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Client-side filtering (for current page only)
+  const filteredIndicators = useMemo(() => {
+    if (!debouncedSearch) return indicators;
+    return indicators.filter(ind =>
+      ind.indicator.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
+  }, [indicators, debouncedSearch]);
+
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const exportIPv4 = () => {
     const ipv4Indicators = indicators.filter(ind => ind.kind === 'ipv4');
@@ -154,9 +185,8 @@ export default function Indicators() {
               <div>
                 <CardTitle>Indicators Database</CardTitle>
                 <CardDescription>
-                  {filteredIndicators.length} validated threats | 
-                  IPv4: {indicators.filter(i => i.kind === 'ipv4').length} | 
-                  Domains: {indicators.filter(i => i.kind === 'domain').length}
+                  Page {page} of {totalPages} | Total: {totalCount.toLocaleString()} indicators | 
+                  Showing: {filteredIndicators.length}
                 </CardDescription>
               </div>
             <div className="flex items-center gap-2">
@@ -169,9 +199,24 @@ export default function Indicators() {
                   className="pl-8"
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page === totalPages || loading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>

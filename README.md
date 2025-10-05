@@ -438,6 +438,33 @@ Supporta:
 
 ---
 
+## 🚀 Performance & Caching
+
+IntelGuard implementa un sistema di cache multi-layer per ridurre i tempi di risposta del 70%:
+
+- **Layer 1 - In-Memory Cache**: LRU cache (60s TTL, 100 max keys) per ~90% hit rate
+- **Layer 2 - Database Cache**: Tabella `validated_indicators_cache` (refresh ogni ora)
+- **Layer 3 - HTTP Cache**: Headers `Cache-Control` per CDN caching (60s)
+
+### Feature Flags
+```bash
+ENABLE_FEED_CACHE=true        # In-memory cache (default: true)
+FEED_CACHE_TTL_SEC=60         # Cache TTL in seconds
+ENABLE_RATE_LIMIT=true        # Rate limiting per token
+ENABLE_FEED_WARMUP=true       # Auto cache warming
+PERF_LOG=false                # Performance logging
+```
+
+**Performance Targets (p95):**
+- Feed API (cache hit): ≤150ms
+- Feed API (cache miss): ≤400ms
+- Dashboard load: ≤2s
+- DB queries/min: -60% reduction
+
+Per dettagli completi, vedi [PERFORMANCE.md](PERFORMANCE.md)
+
+---
+
 ## 🔧 Configuration
 
 ### Environment Variables (Auto-Configurate)
