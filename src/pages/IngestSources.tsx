@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, ArrowRight, Database, Filter } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, ArrowRight, Database, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -58,6 +58,9 @@ export default function IngestSources() {
     kind: 'ipv4' as 'ipv4' | 'domain',
     description: '',
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [refreshDebounce, setRefreshDebounce] = useState(false);
+  const itemsPerPage = 20;
 
   async function loadSources() {
     try {
@@ -78,8 +81,18 @@ export default function IngestSources() {
   };
 
   async function loadRawIndicatorStats(forceRefresh = false) {
+    // Debounce refresh calls
+    if (forceRefresh && refreshDebounce) {
+      toast.info('Please wait before refreshing again');
+      return;
+    }
+
+    if (forceRefresh) {
+      setRefreshDebounce(true);
+      setTimeout(() => setRefreshDebounce(false), 1000);
+    }
+
     try {
-      // Check cache first (5 minute TTL)
       const cacheKey = 'raw_indicator_stats';
       const cacheTTL = 5 * 60 * 1000; // 5 minutes
       const cached = localStorage.getItem(cacheKey);
@@ -304,6 +317,24 @@ export default function IngestSources() {
   const ipv4Sources = sources.filter(s => s.kind === 'ipv4');
   const domainSources = sources.filter(s => s.kind === 'domain');
 
+  // Pagination logic
+  const totalPages = Math.ceil(sources.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSources = sources.slice(startIndex, endIndex);
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -499,94 +530,109 @@ export default function IngestSources() {
         </Card>
       </div>
 
-      {/* Data Processing Funnel */}
-      {rawIndicatorStats && (
-        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Data Processing Pipeline
-            </CardTitle>
-            <CardDescription>
-              Visual representation of indicator deduplication and processing flow
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              {/* Stage 1: Raw Indicators */}
-              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-primary/30 shadow-sm">
-                <Database className="h-8 w-8 mx-auto mb-3 text-primary" />
-                <div className="text-3xl font-bold text-primary mb-2">
-                  {rawIndicatorStats.total.toLocaleString()}
-                </div>
-                <div className="text-sm font-medium mb-1">Total Raw Indicators</div>
-                <div className="text-xs text-muted-foreground">
-                  From {rawIndicatorStats.sources} sources
-                </div>
+      {/* Data Processing Funnel - Always visible */}
+      <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Data Processing Pipeline
+          </CardTitle>
+          <CardDescription>
+            Visual representation of indicator deduplication and processing flow
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            {/* Stage 1: Raw Indicators */}
+            <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-primary/30 shadow-sm">
+              <Database className="h-8 w-8 mx-auto mb-3 text-primary" />
+              <div className="text-3xl font-bold text-primary mb-2">
+                {rawIndicatorStats ? rawIndicatorStats.total.toLocaleString() : '...'}
               </div>
-
-              <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-
-              {/* Stage 2: Unique IPv4 */}
-              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-blue-500/30 shadow-sm">
-                <CheckCircle className="h-8 w-8 mx-auto mb-3 text-blue-600" />
-                <div className="text-3xl font-bold text-blue-600 mb-2">
-                  {rawIndicatorStats.uniqueIpv4.toLocaleString()}
-                </div>
-                <div className="text-sm font-medium mb-1">Unique IPv4 Addresses</div>
-                <div className="text-xs text-muted-foreground">
-                  {rawIndicatorStats.ipv4 > 0 && (
-                    <>
-                      {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% of {rawIndicatorStats.ipv4.toLocaleString()} raw
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-
-              {/* Stage 3: Unique Domains */}
-              <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-green-500/30 shadow-sm">
-                <CheckCircle className="h-8 w-8 mx-auto mb-3 text-green-600" />
-                <div className="text-3xl font-bold text-green-600 mb-2">
-                  {rawIndicatorStats.uniqueDomains.toLocaleString()}
-                </div>
-                <div className="text-sm font-medium mb-1">Unique Domains</div>
-                <div className="text-xs text-muted-foreground">
-                  {rawIndicatorStats.domain > 0 && (
-                    <>
-                      {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% of {rawIndicatorStats.domain.toLocaleString()} raw
-                    </>
-                  )}
-                </div>
+              <div className="text-sm font-medium mb-1">Total Raw Indicators</div>
+              <div className="text-xs text-muted-foreground">
+                From {rawIndicatorStats ? rawIndicatorStats.sources : '...'} sources
               </div>
             </div>
 
-            {/* Summary Stats */}
-            <div className="mt-6 pt-6 border-t grid grid-cols-2 gap-4 text-center">
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">Total Duplicates Removed</div>
-                <div className="text-2xl font-bold text-destructive">
-                  {(rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains).toLocaleString()}
-                </div>
+            <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+
+            {/* Stage 2: Unique IPv4 */}
+            <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-blue-500/30 shadow-sm">
+              <CheckCircle className="h-8 w-8 mx-auto mb-3 text-blue-600" />
+              <div className="text-3xl font-bold text-blue-600 mb-2">
+                {rawIndicatorStats ? rawIndicatorStats.uniqueIpv4.toLocaleString() : '...'}
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">Deduplication Rate</div>
-                <div className="text-2xl font-bold text-primary">
-                  {rawIndicatorStats.total > 0 
-                    ? (((rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains) / rawIndicatorStats.total) * 100).toFixed(1)
-                    : 0}%
-                </div>
+              <div className="text-sm font-medium mb-1">Unique IPv4 Addresses</div>
+              <div className="text-xs text-muted-foreground">
+                {rawIndicatorStats && rawIndicatorStats.ipv4 > 0 ? (
+                  <>
+                    {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% of {rawIndicatorStats.ipv4.toLocaleString()} raw
+                  </>
+                ) : '...'}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            <ArrowRight className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+
+            {/* Stage 3: Unique Domains */}
+            <div className="flex-1 text-center p-6 bg-card rounded-lg border-2 border-green-500/30 shadow-sm">
+              <CheckCircle className="h-8 w-8 mx-auto mb-3 text-green-600" />
+              <div className="text-3xl font-bold text-green-600 mb-2">
+                {rawIndicatorStats ? rawIndicatorStats.uniqueDomains.toLocaleString() : '...'}
+              </div>
+              <div className="text-sm font-medium mb-1">Unique Domains</div>
+              <div className="text-xs text-muted-foreground">
+                {rawIndicatorStats && rawIndicatorStats.domain > 0 ? (
+                  <>
+                    {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% of {rawIndicatorStats.domain.toLocaleString()} raw
+                  </>
+                ) : '...'}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="mt-6 pt-6 border-t grid grid-cols-2 gap-4 text-center">
+            <div>
+              <div className="text-sm text-muted-foreground mb-1">Total Duplicates Removed</div>
+              <div className="text-2xl font-bold text-destructive">
+                {rawIndicatorStats 
+                  ? (rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains).toLocaleString()
+                  : '...'}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground mb-1">Deduplication Rate</div>
+              <div className="text-2xl font-bold text-primary">
+                {rawIndicatorStats && rawIndicatorStats.total > 0 
+                  ? (((rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains) / rawIndicatorStats.total) * 100).toFixed(1)
+                  : '0'}%
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Sources</CardTitle>
-          <CardDescription>Configure and monitor your threat intelligence sources</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>All Sources</CardTitle>
+              <CardDescription>
+                Configure and monitor your threat intelligence sources ({sources.length} total)
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => loadRawIndicatorStats(true)}
+              disabled={refreshDebounce}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshDebounce ? 'animate-spin' : ''}`} />
+              Refresh Stats
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -602,7 +648,7 @@ export default function IngestSources() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sources.map((source) => (
+              {paginatedSources.map((source) => (
                 <TableRow key={source.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -649,6 +695,38 @@ export default function IngestSources() {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {sources.length > itemsPerPage && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(endIndex, sources.length)} of {sources.length} sources
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <div className="text-sm font-medium px-3">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
