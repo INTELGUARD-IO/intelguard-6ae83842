@@ -640,6 +640,21 @@ async function insertValidatedIndicator(
       country = enrichment.country;
       asn = enrichment.asn;
     }
+  } else if (indicator.kind === 'domain') {
+    // For domains, use cached DNS resolution data
+    const { data: resolution } = await supabase
+      .from('domain_resolutions')
+      .select('country, asn')
+      .eq('domain', indicator.indicator)
+      .gt('expires_at', new Date().toISOString())
+      .order('resolved_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (resolution) {
+      country = resolution.country;
+      asn = resolution.asn;
+    }
   }
 
   const { error } = await supabase

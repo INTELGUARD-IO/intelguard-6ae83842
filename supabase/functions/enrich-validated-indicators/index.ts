@@ -46,21 +46,60 @@ Deno.serve(async (req) => {
 
     // Process each indicator
     for (const indicator of indicators) {
-      // Use enrichment_summary view for unified enrichment data
-      const { data: enrichment, error: enrichError } = await supabase
-        .from('enrichment_summary')
-        .select('country, asn, asn_name')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .maybeSingle();
+      let country: string | null = null;
+      let asn: string | null = null;
 
-      if (enrichError) {
-        console.error(`⚠️ Error fetching enrichment for ${indicator.indicator}:`, enrichError);
-        continue;
+      if (indicator.kind === 'ipv4') {
+        // Use enrichment_summary view for unified enrichment data
+        const { data: enrichment, error: enrichError } = await supabase
+          .from('enrichment_summary')
+          .select('country, asn, asn_name')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .maybeSingle();
+
+        if (enrichError) {
+          console.error(`⚠️ Error fetching enrichment for ${indicator.indicator}:`, enrichError);
+          continue;
+        }
+
+        if (!enrichment || (!enrichment.country && !enrichment.asn)) {
+          console.log(`⏭️ No enrichment data available for ${indicator.indicator}`);
+          skippedCount++;
+          continue;
+        }
+
+        country = enrichment.country;
+        asn = enrichment.asn;
+
+      } else if (indicator.kind === 'domain') {
+        // For domains, use cached DNS resolution data
+        const { data: resolution, error: resolutionError } = await supabase
+          .from('domain_resolutions')
+          .select('country, asn')
+          .eq('domain', indicator.indicator)
+          .gt('expires_at', new Date().toISOString())
+          .order('resolved_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (resolutionError) {
+          console.error(`⚠️ Error fetching DNS resolution for ${indicator.indicator}:`, resolutionError);
+          continue;
+        }
+
+        if (!resolution || (!resolution.country && !resolution.asn)) {
+          console.log(`⏭️ No DNS resolution data available for ${indicator.indicator}`);
+          skippedCount++;
+          continue;
+        }
+
+        country = resolution.country;
+        asn = resolution.asn;
       }
 
-      if (!enrichment || (!enrichment.country && !enrichment.asn)) {
-        console.log(`⏭️ No enrichment data available for ${indicator.indicator}`);
+      if (!country && !asn) {
+        console.log(`⏭️ No enrichment data for ${indicator.indicator}`);
         skippedCount++;
         continue;
       }
@@ -69,8 +108,8 @@ Deno.serve(async (req) => {
       const { error: updateError } = await supabase
         .from('validated_indicators')
         .update({
-          country: enrichment.country,
-          asn: enrichment.asn,
+          country,
+          asn,
         })
         .eq('indicator', indicator.indicator)
         .eq('kind', indicator.kind);
@@ -80,7 +119,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      console.log(`✅ Enriched ${indicator.indicator} - Country: ${enrichment.country || 'N/A'}, ASN: ${enrichment.asn || 'N/A'}`);
+      console.log(`✅ Enriched ${indicator.indicator} - Country: ${country || 'N/A'}, ASN: ${asn || 'N/A'}`);
       updatedCount++;
     }
 

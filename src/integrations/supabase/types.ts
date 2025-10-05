@@ -268,6 +268,39 @@ export type Database = {
         }
         Relationships: []
       }
+      domain_resolutions: {
+        Row: {
+          asn: string | null
+          country: string | null
+          domain: string
+          expires_at: string
+          resolved_at: string
+          resolved_ip: string
+          resolver_source: string
+          ttl: number
+        }
+        Insert: {
+          asn?: string | null
+          country?: string | null
+          domain: string
+          expires_at: string
+          resolved_at?: string
+          resolved_ip: string
+          resolver_source?: string
+          ttl?: number
+        }
+        Update: {
+          asn?: string | null
+          country?: string | null
+          domain?: string
+          expires_at?: string
+          resolved_at?: string
+          resolved_ip?: string
+          resolver_source?: string
+          ttl?: number
+        }
+        Relationships: []
+      }
       dynamic_raw_indicators: {
         Row: {
           abuse_ch_checked: boolean
@@ -1374,6 +1407,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_cloudflare_urlscan_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_domain_resolutions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

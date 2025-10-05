@@ -107,3 +107,7 @@ schedule = "0 */8 * * *"
 [functions.enrich-validated-indicators]
 verify_jwt = false
 schedule = "0 2 * * *"
+
+[functions.domain-resolver-validator]
+verify_jwt = false
+schedule = "0 */6 * * *"
