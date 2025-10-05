@@ -623,35 +623,22 @@ async function insertValidatedIndicator(
   confidence: number
 ): Promise<void> {
   
-  // Extract country and ASN from enrichment data if available
+  // Extract country and ASN from enrichment_summary view (unified enrichment)
   let country: string | null = null;
   let asn: string | null = null;
 
   if (indicator.kind === 'ipv4') {
-    // Try OTX enrichment
-    const { data: otxData } = await supabase
-      .from('otx_enrichment')
+    // Use enrichment_summary view for unified data from all sources
+    const { data: enrichment } = await supabase
+      .from('enrichment_summary')
       .select('country, asn')
       .eq('indicator', indicator.indicator)
+      .eq('kind', indicator.kind)
       .maybeSingle();
     
-    if (otxData) {
-      country = otxData.country;
-      asn = otxData.asn;
-    }
-
-    // Fallback to BGPView or Cloudflare Radar enrichment
-    if (!country || !asn) {
-      const { data: bgpData } = await supabase
-        .from('bgpview_enrichment')
-        .select('country_code, asn')
-        .eq('indicator', indicator.indicator)
-        .maybeSingle();
-      
-      if (bgpData) {
-        country = country || bgpData.country_code;
-        asn = asn || (bgpData.asn ? String(bgpData.asn) : null);
-      }
+    if (enrichment) {
+      country = enrichment.country;
+      asn = enrichment.asn;
     }
   }
 

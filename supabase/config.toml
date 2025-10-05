@@ -103,3 +103,7 @@ verify_jwt = false
 [functions.cloudflare-urlscan-validator]
 verify_jwt = false
 schedule = "0 */8 * * *"
+
+[functions.enrich-validated-indicators]
+verify_jwt = false
+schedule = "0 2 * * *"
