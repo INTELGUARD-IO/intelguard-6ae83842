@@ -1423,11 +1423,45 @@ export type Database = {
         }
         Relationships: []
       }
+      validator_stats_mv: {
+        Row: {
+          abuse_ch_checked_count: number | null
+          abuse_ch_malicious_count: number | null
+          abuseipdb_checked_count: number | null
+          abuseipdb_malicious_count: number | null
+          censys_checked_count: number | null
+          censys_malicious_count: number | null
+          cloudflare_urlscan_checked_count: number | null
+          cloudflare_urlscan_malicious_count: number | null
+          honeydb_checked_count: number | null
+          honeydb_malicious_count: number | null
+          last_refreshed: string | null
+          neutrinoapi_checked_count: number | null
+          neutrinoapi_malicious_count: number | null
+          otx_checked_count: number | null
+          otx_malicious_count: number | null
+          safebrowsing_checked_count: number | null
+          safebrowsing_malicious_count: number | null
+          urlscan_checked_count: number | null
+          urlscan_malicious_count: number | null
+          virustotal_checked_count: number | null
+          virustotal_malicious_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _call_edge: {
         Args: { function_name: string }
         Returns: undefined
+      }
+      backfill_dynamic_raw_indicators: {
+        Args: { batch_size?: number }
+        Returns: {
+          execution_time_ms: number
+          processed_count: number
+          total_batches: number
+        }[]
       }
       classify_threat_type: {
         Args: {
@@ -1556,6 +1590,10 @@ export type Database = {
           p_new_source: string
           p_validator_fields?: Json
         }
+        Returns: undefined
+      }
+      refresh_validator_stats_mv: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
     }

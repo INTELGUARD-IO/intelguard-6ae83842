@@ -6,105 +6,58 @@ import { Shield, CheckCircle2, XCircle } from "lucide-react";
 
 export const ValidatorStatsCard = () => {
   const { data: stats } = useQuery({
-    queryKey: ['validator-stats-detailed'],
+    queryKey: ['validator-stats-mv'],
     queryFn: async () => {
-      const { data: dynamic } = await supabase
-        .from('dynamic_raw_indicators')
+      const { data, error } = await supabase
+        .from('validator_stats_mv')
         .select('*')
-        .gte('confidence', 50)
-        .eq('whitelisted', false);
+        .single();
 
-      if (!dynamic) return null;
+      if (error) throw error;
+      if (!data) return null;
 
-      const validators = {
-        otx: { checked: 0, malicious: 0 },
-        safebrowsing: { checked: 0, malicious: 0 },
-        abuseipdb: { checked: 0, malicious: 0 },
-        neutrinoapi: { checked: 0, malicious: 0 },
-        urlscan: { checked: 0, malicious: 0 },
-        honeydb: { checked: 0, malicious: 0 },
-        abusech: { checked: 0, malicious: 0 },
-        virustotal: { checked: 0, malicious: 0 },
-        censys: { checked: 0, malicious: 0 },
+      // Map materialized view columns to component format
+      return {
+        otx: { 
+          checked: data.otx_checked_count || 0, 
+          malicious: data.otx_malicious_count || 0 
+        },
+        safebrowsing: { 
+          checked: data.safebrowsing_checked_count || 0, 
+          malicious: data.safebrowsing_malicious_count || 0 
+        },
+        abuseipdb: { 
+          checked: data.abuseipdb_checked_count || 0, 
+          malicious: data.abuseipdb_malicious_count || 0 
+        },
+        neutrinoapi: { 
+          checked: data.neutrinoapi_checked_count || 0, 
+          malicious: data.neutrinoapi_malicious_count || 0 
+        },
+        urlscan: { 
+          checked: data.urlscan_checked_count || 0, 
+          malicious: data.urlscan_malicious_count || 0 
+        },
+        honeydb: { 
+          checked: data.honeydb_checked_count || 0, 
+          malicious: data.honeydb_malicious_count || 0 
+        },
+        abusech: { 
+          checked: data.abuse_ch_checked_count || 0, 
+          malicious: data.abuse_ch_malicious_count || 0 
+        },
+        virustotal: { 
+          checked: data.virustotal_checked_count || 0, 
+          malicious: data.virustotal_malicious_count || 0 
+        },
+        censys: { 
+          checked: data.censys_checked_count || 0, 
+          malicious: data.censys_malicious_count || 0 
+        },
       };
-
-      dynamic.forEach(ind => {
-        // OTX
-        if (ind.otx_checked) {
-          validators.otx.checked++;
-          if ((ind.otx_score !== null && ind.otx_score >= 3) || ind.otx_verdict === 'malicious') {
-            validators.otx.malicious++;
-          }
-        }
-
-        // SafeBrowsing
-        if (ind.safebrowsing_checked) {
-          validators.safebrowsing.checked++;
-          if (ind.safebrowsing_verdict && ind.safebrowsing_verdict !== 'clean') {
-            validators.safebrowsing.malicious++;
-          }
-        }
-
-        // AbuseIPDB
-        if (ind.abuseipdb_checked) {
-          validators.abuseipdb.checked++;
-          if (ind.abuseipdb_in_blacklist || (ind.abuseipdb_score !== null && ind.abuseipdb_score >= 70)) {
-            validators.abuseipdb.malicious++;
-          }
-        }
-
-        // NeutrinoAPI
-        if (ind.neutrinoapi_checked) {
-          validators.neutrinoapi.checked++;
-          if (ind.neutrinoapi_in_blocklist || (ind.neutrinoapi_host_reputation_score !== null && ind.neutrinoapi_host_reputation_score <= 30)) {
-            validators.neutrinoapi.malicious++;
-          }
-        }
-
-        // URLScan
-        if (ind.urlscan_checked) {
-          validators.urlscan.checked++;
-          if (ind.urlscan_malicious || (ind.urlscan_score !== null && ind.urlscan_score >= 70)) {
-            validators.urlscan.malicious++;
-          }
-        }
-
-        // HoneyDB
-        if (ind.honeydb_checked) {
-          validators.honeydb.checked++;
-          if (ind.honeydb_in_blacklist) {
-            validators.honeydb.malicious++;
-          }
-        }
-
-        // Abuse.ch
-        if (ind.abuse_ch_checked) {
-          validators.abusech.checked++;
-          if (ind.abuse_ch_is_fp === false) {
-            validators.abusech.malicious++;
-          }
-        }
-
-        // VirusTotal
-        if (ind.virustotal_checked) {
-          validators.virustotal.checked++;
-          if (ind.virustotal_malicious || (ind.virustotal_score !== null && ind.virustotal_score >= 5)) {
-            validators.virustotal.malicious++;
-          }
-        }
-
-        // Censys
-        if (ind.censys_checked) {
-          validators.censys.checked++;
-          if (ind.censys_malicious || (ind.censys_score !== null && ind.censys_score >= 70)) {
-            validators.censys.malicious++;
-          }
-        }
-      });
-
-      return validators;
     },
-    refetchInterval: 60000 // Refresh every 60s
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000, // Cache for 30 seconds
   });
 
   if (!stats) return null;
