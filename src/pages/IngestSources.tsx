@@ -77,24 +77,46 @@ export default function IngestSources() {
     }
   };
 
-  async function loadRawIndicatorStats() {
+  async function loadRawIndicatorStats(forceRefresh = false) {
     try {
-      // Use optimized RPC function to get all stats in a single query
+      // Check cache first (5 minute TTL)
+      const cacheKey = 'raw_indicator_stats';
+      const cacheTTL = 5 * 60 * 1000; // 5 minutes
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (!forceRefresh && cached) {
+        const { data: cachedData, timestamp } = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+        
+        if (age < cacheTTL) {
+          setRawIndicatorStats(cachedData);
+          return;
+        }
+      }
+
+      // Fetch fresh data
       const { data, error } = await supabase
         .rpc('get_raw_indicator_stats' as any);
 
       if (error) throw error;
 
       const stats = data?.[0];
-      
-      setRawIndicatorStats({
+      const statsData = {
         total: Number(stats?.total_count) || 0,
         ipv4: Number(stats?.ipv4_count) || 0,
         domain: Number(stats?.domain_count) || 0,
         sources: Number(stats?.unique_sources_count) || 0,
         uniqueIpv4: Number(stats?.unique_ipv4_count) || 0,
         uniqueDomains: Number(stats?.unique_domain_count) || 0
-      });
+      };
+      
+      setRawIndicatorStats(statsData);
+      
+      // Cache the result
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: statsData,
+        timestamp: Date.now()
+      }));
     } catch (error) {
       console.error('Error loading raw indicator stats:', error);
     }
@@ -256,7 +278,7 @@ export default function IngestSources() {
         setUploadConfig({ kind: 'ipv4', sourceName: '', file: null });
         if (fileInputRef.current) fileInputRef.current.value = '';
         loadSources();
-        loadRawIndicatorStats();
+        loadRawIndicatorStats(true); // Force refresh after upload
       } else {
         toast.error('Upload failed: ' + result.errorDetails.join(', '));
       }
@@ -448,19 +470,27 @@ export default function IngestSources() {
                 <>
                   <Badge variant="outline" className="mr-2">{rawIndicatorStats.sources} sources</Badge>
                 </>
-              ) : 'Loading...'}
+              ) : (
+                <div className="h-5 w-20 bg-muted animate-pulse rounded" />
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {rawIndicatorStats ? rawIndicatorStats.total.toLocaleString() : '...'}
+              {rawIndicatorStats ? (
+                rawIndicatorStats.total.toLocaleString()
+              ) : (
+                <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-2">
               {rawIndicatorStats ? (
                 <>
                   IPv4: {rawIndicatorStats.ipv4.toLocaleString()} / Domains: {rawIndicatorStats.domain.toLocaleString()}
                 </>
-              ) : 'Loading statistics...'}
+              ) : (
+                <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+              )}
             </p>
           </CardContent>
         </Card>
