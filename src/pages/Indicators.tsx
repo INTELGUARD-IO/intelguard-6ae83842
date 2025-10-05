@@ -36,26 +36,20 @@ export default function Indicators() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'ipv4' | 'domain'>('all');
 
   useEffect(() => {
     loadIndicators();
-  }, [activeTab]);
+  }, []);
 
   const loadIndicators = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('public_threat_indicators')
         .select('*')
+        .gt('sources_count', 1)
         .order('last_seen', { ascending: false })
         .limit(1000);
-
-      if (activeTab !== 'all') {
-        query = query.eq('kind', activeTab);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setIndicators(data || []);
@@ -183,21 +177,13 @@ export default function Indicators() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="ipv4">IPv4</TabsTrigger>
-              <TabsTrigger value="domain">Domains</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value={activeTab} className="space-y-4">
-              {loading ? (
+          {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="rounded-md border">
-                  <Table>
+            <div className="rounded-md border">
+              <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Indicator</TableHead>
@@ -247,15 +233,15 @@ export default function Indicators() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary"
-                                    style={{ width: `${(ind.confidence || 0) * 100}%` }}
-                                  />
-                                </div>
-                                <span className="text-sm text-muted-foreground">
-                                  {((ind.confidence || 0) * 100).toFixed(0)}%
-                                </span>
+                                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                   <div
+                                     className="h-full bg-primary"
+                                     style={{ width: `${ind.confidence || 0}%` }}
+                                   />
+                                 </div>
+                                 <span className="text-sm text-muted-foreground">
+                                   {(ind.confidence || 0).toFixed(0)}%
+                                 </span>
                               </div>
                             </TableCell>
                             <TableCell>{ind.country || '-'}</TableCell>
@@ -274,11 +260,9 @@ export default function Indicators() {
                         ))
                       )}
                     </TableBody>
-                  </Table>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

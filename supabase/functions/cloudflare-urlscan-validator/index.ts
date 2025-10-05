@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const cloudflareToken = Deno.env.get('CF_RADAR_TOKEN')!;
+    const cloudflareToken = Deno.env.get('CLOUDFLARE_URLSCAN_API_KEY')!;
     const cloudflareAccountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID')!;
 
     if (!cloudflareAccountId) {
