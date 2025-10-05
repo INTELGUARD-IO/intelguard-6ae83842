@@ -182,13 +182,13 @@ const Monitoring = () => {
 
   const loadMetrics = async () => {
     try {
-      // Direct count queries - more reliable and faster than RPC
-      console.log('📊 Loading raw indicators count...');
+      // Use estimated counts for large tables to prevent timeouts
+      console.log('📊 Loading metrics with optimized queries...');
       
-      // Total raw indicators count
+      // Total raw indicators count (estimated for speed)
       const { count: totalCount, error: totalError } = await supabase
         .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
+        .select('*', { count: 'estimated', head: true })
         .is('removed_at', null);
       
       if (totalError) {
@@ -204,17 +204,17 @@ const Monitoring = () => {
         setRawIndicators(totalCount || 0);
       }
       
-      // Count by type (IPv4)
+      // Count by type (IPv4) - estimated
       const { count: ipv4Count } = await supabase
         .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
+        .select('*', { count: 'estimated', head: true })
         .is('removed_at', null)
         .eq('kind', 'ipv4');
       
-      // Count by type (Domain)
+      // Count by type (Domain) - estimated
       const { count: domainCount } = await supabase
         .from('raw_indicators')
-        .select('*', { count: 'exact', head: true })
+        .select('*', { count: 'estimated', head: true })
         .is('removed_at', null)
         .eq('kind', 'domain');
       
@@ -226,23 +226,22 @@ const Monitoring = () => {
       console.log('📈 Indicators by type:', typeCounts);
       setIndicatorsByType(typeCounts);
 
-      // Dynamic indicators count
+      // Dynamic indicators count - estimated
       const { count: dynamicCount } = await supabase
         .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'estimated', head: true });
       setDynamicIndicators(dynamicCount || 0);
 
-      // Validated indicators count
+      // Validated indicators count - estimated
       const { count: validatedCount } = await supabase
         .from('validated_indicators')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'estimated', head: true });
       setValidatedIndicators(validatedCount || 0);
 
-      // Vendor checks count
-      const { count: vendorCount } = await supabase
-        .from('vendor_checks')
-        .select('*', { count: 'exact', head: true });
-      setVendorChecks(vendorCount || 0);
+      // Vendor checks - removed (table no longer exists)
+      setVendorChecks(0);
+      
+      console.log('✅ Metrics loaded successfully');
     } catch (error) {
       console.error('❌ Error loading metrics:', error);
       toast({
@@ -326,11 +325,8 @@ const Monitoring = () => {
         .from('abuseipdb_blacklist')
         .select('*', { count: 'exact', head: true });
 
-      // Get urlscan stats from vendor_checks
-      const { count: urlscan } = await supabase
-        .from('vendor_checks')
-        .select('*', { count: 'exact', head: true })
-        .eq('vendor', 'urlscan');
+      // URLScan stats - vendor_checks table removed
+      const urlscan = 0;
 
       // Get dynamic indicators checked by each validator
       const { data: dynamicData } = await supabase
