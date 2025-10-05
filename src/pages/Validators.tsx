@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 import WhitelistMetrics from "@/components/WhitelistMetrics";
 import WhitelistTimeline from "@/components/WhitelistTimeline";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ValidatorStats {
   name: string;
@@ -33,6 +34,56 @@ interface RecentJob {
   last_validated: string;
   sources: string[];
 }
+
+const ValidatorsSkeleton = () => (
+  <div className="container mx-auto p-6 space-y-6">
+    {/* Header skeleton */}
+    <div className="space-y-2">
+      <Skeleton className="h-10 w-80" />
+      <Skeleton className="h-5 w-96" />
+    </div>
+
+    {/* Whitelist metrics skeleton */}
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-6 w-48" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </CardContent>
+    </Card>
+
+    {/* Job stats cards skeleton */}
+    <div className="grid gap-4 md:grid-cols-4">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-24 mb-2" />
+            <Skeleton className="h-3 w-20" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    {/* Validator table skeleton */}
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-6 w-40" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
 
 export default function Validators() {
   const { isSuperAdmin, loading: roleLoading } = useUserRole();
@@ -385,11 +436,7 @@ export default function Validators() {
   };
 
   if (loading || roleLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Activity className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    return <ValidatorsSkeleton />;
   }
 
   return (
