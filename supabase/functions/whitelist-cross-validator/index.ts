@@ -80,38 +80,67 @@ serve(async (req) => {
 
     console.log(`📋 Found ${indicators.length} indicators to validate\n`);
 
-    // Step 3: Cross-validate
+    // Step 3: Cross-validate with optimized batch updates
+    console.log('\n🔍 Step 3: Cross-validating indicators against whitelists...');
+    const performanceStart = Date.now();
+    
     let ciscoMatches = 0;
     let cloudflareMatches = 0;
     let bothMatches = 0;
     let totalWhitelisted = 0;
 
-    const batchSize = 100;
-    for (let i = 0; i < indicators.length; i += batchSize) {
-      const batch = indicators.slice(i, i + batchSize);
-      
-      for (const indicator of batch) {
-        const domain = indicator.indicator.toLowerCase();
-        const inCisco = ciscoSet.has(domain);
-        const inCloudflare = cloudflareSet.has(domain);
+    // Collect all whitelisted indicators first (in-memory, fast)
+    const whitelistedIndicators: Array<{id: number, indicator: string, kind: string, source: string}> = [];
+    
+    for (const indicator of indicators) {
+      const domain = indicator.indicator.toLowerCase();
+      const inCisco = ciscoSet.has(domain);
+      const inCloudflare = cloudflareSet.has(domain);
 
-        if (inCisco || inCloudflare) {
-          totalWhitelisted++;
+      if (inCisco || inCloudflare) {
+        totalWhitelisted++;
+        
+        let source = '';
+        if (inCisco && inCloudflare) {
+          bothMatches++;
+          source = 'both';
+        } else if (inCisco) {
+          ciscoMatches++;
+          source = 'cisco';
+        } else {
+          cloudflareMatches++;
+          source = 'cloudflare';
+        }
+
+        whitelistedIndicators.push({
+          id: indicator.id,
+          indicator: indicator.indicator,
+          kind: indicator.kind,
+          source
+        });
+      }
+    }
+
+    console.log(`📊 Found ${totalWhitelisted} whitelisted indicators (Cisco: ${ciscoMatches}, Cloudflare: ${cloudflareMatches}, Both: ${bothMatches})`);
+
+    if (whitelistedIndicators.length === 0) {
+      console.log('✅ No whitelisted indicators found, skipping batch updates');
+    } else {
+      // Batch update dynamic_raw_indicators (100 at a time, grouped by source)
+      console.log(`\n🔄 Updating ${whitelistedIndicators.length} indicators in dynamic_raw_indicators...`);
+      const batchSize = 100;
+      const updateStart = Date.now();
+      let totalUpdated = 0;
+
+      for (const source of ['cisco', 'cloudflare', 'both']) {
+        const sourceIndicators = whitelistedIndicators.filter(ind => ind.source === source);
+        if (sourceIndicators.length === 0) continue;
+
+        for (let i = 0; i < sourceIndicators.length; i += batchSize) {
+          const batch = sourceIndicators.slice(i, i + batchSize);
+          const ids = batch.map(ind => ind.id);
           
-          let source = '';
-          if (inCisco && inCloudflare) {
-            bothMatches++;
-            source = 'both';
-          } else if (inCisco) {
-            ciscoMatches++;
-            source = 'cisco';
-          } else {
-            cloudflareMatches++;
-            source = 'cloudflare';
-          }
-
-          // Update dynamic_raw_indicators
-          await supabase
+          const { error } = await supabase
             .from('dynamic_raw_indicators')
             .update({
               confidence: 0,
@@ -119,24 +148,53 @@ serve(async (req) => {
               whitelist_source: source,
               last_validated: new Date().toISOString()
             })
-            .eq('id', indicator.id);
+            .in('id', ids);
 
-          // Insert into validated_indicators
-          await supabase
-            .from('validated_indicators')
-            .upsert({
-              indicator: indicator.indicator,
-              kind: indicator.kind,
-              confidence: 0,
-              last_validated: new Date().toISOString()
-            }, {
-              onConflict: 'indicator,kind'
-            });
+          if (error) {
+            console.error(`❌ Error updating batch for source ${source}:`, error);
+          } else {
+            totalUpdated += batch.length;
+            console.log(`   ✅ Updated ${batch.length} indicators (source: ${source})`);
+          }
         }
       }
 
-      console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(indicators.length / batchSize)}`);
+      console.log(`✅ Batch update completed: ${totalUpdated} indicators in ${Date.now() - updateStart}ms`);
+
+      // Batch upsert validated_indicators (100 at a time)
+      console.log(`\n🔄 Upserting ${whitelistedIndicators.length} indicators to validated_indicators...`);
+      const upsertStart = Date.now();
+      let totalUpserted = 0;
+
+      for (let i = 0; i < whitelistedIndicators.length; i += batchSize) {
+        const batch = whitelistedIndicators.slice(i, i + batchSize);
+        const validatedData = batch.map(ind => ({
+          indicator: ind.indicator,
+          kind: ind.kind,
+          confidence: 0,
+          last_validated: new Date().toISOString()
+        }));
+        
+        const { error } = await supabase
+          .from('validated_indicators')
+          .upsert(validatedData, {
+            onConflict: 'indicator,kind'
+          });
+
+        if (error) {
+          console.error(`❌ Error upserting batch:`, error);
+        } else {
+          totalUpserted += batch.length;
+          console.log(`   ✅ Upserted ${batch.length} indicators`);
+        }
+      }
+
+      console.log(`✅ Batch upsert completed: ${totalUpserted} indicators in ${Date.now() - upsertStart}ms`);
     }
+
+    const performanceTotal = Date.now() - performanceStart;
+    console.log(`\n⚡ Cross-validation performance: ${performanceTotal}ms (${Math.round(indicators.length / (performanceTotal / 1000))} indicators/sec)`);
+    console.log(`💰 API quota saved: ~${totalWhitelisted * 10} validator calls\n`);
 
     // Step 3: Call intelligent-validator for smart promotion
     console.log('\n🎯 Step 3: Calling intelligent-validator for multi-source consensus...');
