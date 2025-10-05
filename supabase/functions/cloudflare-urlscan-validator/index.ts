@@ -73,7 +73,8 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Fetch domains to scan
-    const BATCH_SIZE = 10; // Small batch to respect rate limits
+    const BATCH_SIZE = 50; // Increased batch size for better throughput
+    const MAX_RETRIES = 2; // Max retry attempts per scan
     console.log(`📊 Fetching up to ${BATCH_SIZE} domains to scan...`);
 
     const { data: domains, error: fetchError } = await supabase
@@ -138,29 +139,60 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Submit scan
+        // Submit scan with retry logic
         const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan`;
         
-        console.log(`📤 Submitting scan for ${domain.indicator}...`);
-        const scanResponse = await fetch(scanUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${cloudflareToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: `https://${domain.indicator}`,
-            visibility: 'unlisted',
-            customHeaders: {},
-          }),
-        });
+        let scanResponse;
+        let scanData: { result: ScanSubmission } | null = null;
+        let retryCount = 0;
+        
+        while (retryCount <= MAX_RETRIES) {
+          try {
+            console.log(`📤 Submitting scan for ${domain.indicator} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+            scanResponse = await fetch(scanUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${cloudflareToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: `https://${domain.indicator}`,
+                visibility: 'unlisted',
+                customHeaders: {},
+              }),
+            });
 
-        if (!scanResponse.ok) {
-          const errorText = await scanResponse.text();
-          console.error(`Scan submission failed for ${domain.indicator}:`, errorText);
+            if (scanResponse.ok) {
+              scanData = await scanResponse.json();
+              break; // Success, exit retry loop
+            }
+            
+            const errorText = await scanResponse.text();
+            console.error(`Scan submission failed (attempt ${retryCount + 1}):`, errorText);
+            
+            // Exponential backoff: 2s, 4s, 8s
+            if (retryCount < MAX_RETRIES) {
+              const backoffMs = Math.pow(2, retryCount + 1) * 1000;
+              console.log(`⏳ Waiting ${backoffMs}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffMs));
+            }
+            
+            retryCount++;
+          } catch (fetchError) {
+            console.error(`Fetch error (attempt ${retryCount + 1}):`, fetchError);
+            retryCount++;
+            if (retryCount <= MAX_RETRIES) {
+              const backoffMs = Math.pow(2, retryCount) * 1000;
+              await new Promise(resolve => setTimeout(resolve, backoffMs));
+            }
+          }
+        }
+
+        // If all retries failed
+        if (!scanData) {
+          console.error(`❌ All retry attempts failed for ${domain.indicator}`);
           failed++;
           
-          // Mark as checked with null values to avoid reprocessing
           await supabase
             .from('dynamic_raw_indicators')
             .update({
@@ -172,7 +204,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const scanData: { result: ScanSubmission } = await scanResponse.json();
         const scanUuid = scanData.result.uuid;
         console.log(`✓ Scan submitted for ${domain.indicator}, UUID: ${scanUuid}`);
 

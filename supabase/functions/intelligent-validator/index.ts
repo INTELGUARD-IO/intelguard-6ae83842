@@ -12,13 +12,71 @@ interface ValidatorVote {
   reason?: string;
 }
 
+// TLD sospetti comuni
+const SUSPICIOUS_TLDS = [
+  '.tk', '.ml', '.ga', '.cf', '.gq', // Free TLDs
+  '.top', '.xyz', '.work', '.click', '.link', '.download', '.win',
+  '.bid', '.stream', '.loan', '.racing', '.accountant', '.science',
+  '.party', '.review', '.trade', '.webcam', '.date', '.faith'
+];
+
+// Calcola uno score avanzato per un indicatore
+function calculateAdvancedScore(indicator: any, votes: ValidatorVote[]): number {
+  let score = 0;
+  
+  // Base score from validators (0-70 points)
+  const maliciousVotes = votes.filter(v => v.vote === 'malicious').length;
+  const totalVotes = votes.length;
+  if (totalVotes > 0) {
+    score += (maliciousVotes / totalVotes) * 70;
+  }
+  
+  // Confidence penalty/bonus (-10 to +10 points)
+  if (indicator.confidence < 60) {
+    score -= 10;
+  } else if (indicator.confidence >= 80) {
+    score += 10;
+  }
+  
+  // TLD check for domains (-15 to +5 points)
+  if (indicator.kind === 'domain') {
+    const hasSuspiciousTLD = SUSPICIOUS_TLDS.some(tld => 
+      indicator.indicator.toLowerCase().endsWith(tld)
+    );
+    
+    if (hasSuspiciousTLD) {
+      score += 15; // Suspicious TLD increases malicious score
+    } else {
+      // Common legitimate TLDs (.com, .org, .net, .edu, .gov) bonus
+      const legitimateTLDs = ['.com', '.org', '.net', '.edu', '.gov', '.mil'];
+      if (legitimateTLDs.some(tld => indicator.indicator.toLowerCase().endsWith(tld))) {
+        score -= 5; // Reduce score slightly for legit TLDs
+      }
+    }
+  }
+  
+  // Whitelist bonus (-20 points)
+  if (indicator.whitelisted || indicator.is_trusted) {
+    score -= 20;
+  }
+  
+  // Source count bonus (0-10 points)
+  if (indicator.source_count >= 5) {
+    score += 10;
+  } else if (indicator.source_count >= 3) {
+    score += 5;
+  }
+  
+  return Math.max(0, Math.min(100, score)); // Clamp 0-100
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('[intelligent-validator] 🧠 Starting intelligent validation with multi-source consensus...');
+    console.log('[intelligent-validator] 🧠 Starting intelligent validation with advanced scoring...');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -54,6 +112,23 @@ Deno.serve(async (req) => {
     const toPromote: any[] = [];
 
     for (const indicator of indicators) {
+      // CHECK 1: Whitelist trusted domains
+      let isTrusted = false;
+      if (indicator.kind === 'domain') {
+        const { data: trustedDomain } = await supabase
+          .from('trusted_domains')
+          .select('domain')
+          .eq('domain', indicator.indicator)
+          .maybeSingle();
+        
+        if (trustedDomain) {
+          isTrusted = true;
+          console.log(`[intelligent-validator] 🛡️ TRUSTED: ${indicator.indicator} (in whitelist)`);
+          skipped++;
+          continue;
+        }
+      }
+
       const votes: ValidatorVote[] = [];
 
       // === VALIDATOR 1: OTX (AlienVault) ===
@@ -189,42 +264,52 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Calculate consensus (threshold differenziato per tipo)
+      // === ADVANCED SCORING SYSTEM ===
+      const advancedScore = calculateAdvancedScore({ ...indicator, is_trusted: isTrusted }, votes);
+      
+      // Calculate basic consensus
       const maliciousVotes = votes.filter(v => v.vote === 'malicious').length;
       const totalVotes = votes.length;
       const consensusThreshold = indicator.kind === 'domain' ? 1 : 2; // 1 per domini, 2 per IP
 
-      if (maliciousVotes >= consensusThreshold && totalVotes >= 2) {
+      // Promotion logic con advanced scoring
+      const shouldPromote = 
+        (maliciousVotes >= consensusThreshold && totalVotes >= 2) || // Standard consensus
+        (advancedScore >= 75 && indicator.confidence >= 70); // High advanced score + high confidence
+
+      if (shouldPromote) {
         // PROMOTE TO VALIDATED!
         const validatorNames = votes.filter(v => v.vote === 'malicious').map(v => v.name).join(', ');
         
-        console.log(`[intelligent-validator] ✅ PROMOTED: ${indicator.indicator} (${indicator.kind}) - ${maliciousVotes}/${totalVotes} validators agree: ${validatorNames}`);
+        console.log(`[intelligent-validator] ✅ PROMOTED: ${indicator.indicator} (${indicator.kind}) - Score: ${advancedScore.toFixed(1)}, Votes: ${maliciousVotes}/${totalVotes} (${validatorNames})`);
         
-      // Fetch enrichment data per country/asn
-      const { data: enrichment } = await supabase
-        .from('enrichment_summary')
-        .select('country, asn, asn_name')
-        .eq('indicator', indicator.indicator)
-        .eq('kind', indicator.kind)
-        .maybeSingle();
+        // Fetch enrichment data per country/asn
+        const { data: enrichment } = await supabase
+          .from('enrichment_summary')
+          .select('country, asn, asn_name')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .maybeSingle();
 
-      toPromote.push({
-        indicator: indicator.indicator,
-        kind: indicator.kind,
-        confidence: indicator.confidence,
-        country: enrichment?.country || null,
-        asn: enrichment?.asn || null,
-        last_validated: new Date().toISOString(),
-      });
+        toPromote.push({
+          indicator: indicator.indicator,
+          kind: indicator.kind,
+          confidence: indicator.confidence,
+          country: enrichment?.country || null,
+          asn: enrichment?.asn || null,
+          last_validated: new Date().toISOString(),
+        });
 
         if (indicator.kind === 'ipv4') promotedIpv4++;
         else if (indicator.kind === 'domain') promotedDomains++;
       } else {
         skipped++;
-        if (totalVotes > 0 && maliciousVotes === 0) {
-          console.log(`[intelligent-validator] ⊘ SKIPPED: ${indicator.indicator} - All ${totalVotes} validators say clean`);
+        if (advancedScore >= 60 && advancedScore < 75) {
+          console.log(`[intelligent-validator] ⚠️ SUSPICIOUS (not promoted): ${indicator.indicator} - Score: ${advancedScore.toFixed(1)} (needs >= 75 or more validators)`);
+        } else if (totalVotes > 0 && maliciousVotes === 0) {
+          console.log(`[intelligent-validator] ⊘ SKIPPED: ${indicator.indicator} - All ${totalVotes} validators say clean, Score: ${advancedScore.toFixed(1)}`);
         } else if (maliciousVotes < consensusThreshold) {
-          console.log(`[intelligent-validator] ⏭️ SKIPPED: ${indicator.indicator} - Only ${maliciousVotes}/${totalVotes} validators agree (need ${consensusThreshold})`);
+          console.log(`[intelligent-validator] ⏭️ SKIPPED: ${indicator.indicator} - Only ${maliciousVotes}/${totalVotes} validators agree, Score: ${advancedScore.toFixed(1)} (need ${consensusThreshold} votes or score >= 75)`);
         }
       }
 

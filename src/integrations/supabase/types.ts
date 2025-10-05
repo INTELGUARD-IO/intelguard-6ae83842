@@ -1104,6 +1104,33 @@ export type Database = {
         }
         Relationships: []
       }
+      trusted_domains: {
+        Row: {
+          added_at: string
+          domain: string
+          notes: string | null
+          rank: number | null
+          source: string
+          verified_at: string | null
+        }
+        Insert: {
+          added_at?: string
+          domain: string
+          notes?: string | null
+          rank?: number | null
+          source: string
+          verified_at?: string | null
+        }
+        Update: {
+          added_at?: string
+          domain?: string
+          notes?: string | null
+          rank?: number | null
+          source?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       validated_indicators: {
         Row: {
           asn: string | null
@@ -1259,6 +1286,22 @@ export type Database = {
       }
     }
     Views: {
+      cron_job_status: {
+        Row: {
+          active: boolean | null
+          database: string | null
+          jobid: number | null
+          jobname: string | null
+          last_duration_seconds: number | null
+          last_error: string | null
+          last_run_end: string | null
+          last_run_start: string | null
+          last_status: string | null
+          next_run_estimated: string | null
+          schedule: string | null
+        }
+        Relationships: []
+      }
       enrichment_summary: {
         Row: {
           asn: string | null

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Play, RefreshCw, Database, Activity, Clock, TrendingUp, Shield, Globe, Search, Code, FileText, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuditLogsTab } from '@/components/AuditLogsTab';
+import { CronJobMonitor } from '@/components/CronJobMonitor';
 import {
   Table,
   TableBody,
@@ -697,57 +698,17 @@ export default function System() {
         </TabsContent>
 
         <TabsContent value="cron" className="space-y-4">
+          <CronJobMonitor />
+          
           <Card>
             <CardHeader>
-              <CardTitle>Cron Job Status</CardTitle>
+              <CardTitle>Validation Pipeline Tools</CardTitle>
               <CardDescription>
-                Monitor scheduled tasks and validation pipeline
+                Quick actions for validation jobs and daily deltas
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">Ingest Pipeline</div>
-                    <div className="text-sm text-muted-foreground">
-                      Runs every 5 minutes
-                    </div>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">Schedule Validations</div>
-                    <div className="text-sm text-muted-foreground">
-                      Runs every 10 minutes
-                    </div>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">Run Validations</div>
-                    <div className="text-sm text-muted-foreground">
-                      Runs every 10 minutes
-                    </div>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">Daily Delta</div>
-                    <div className="text-sm text-muted-foreground">
-                      Runs daily at midnight
-                    </div>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
+            <CardContent>
+              <div className="flex gap-2">
                 <Button onClick={checkValidationJobs} variant="outline">
                   Check Validation Jobs
                 </Button>
