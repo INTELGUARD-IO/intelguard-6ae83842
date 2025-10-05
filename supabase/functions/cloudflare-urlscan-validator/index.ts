@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Fetch domains to scan
-    const BATCH_SIZE = 200; // Increased batch size for faster coverage
-    const MAX_RETRIES = 2; // Max retry attempts per scan
+    const BATCH_SIZE = 1000; // Aggressive batch size for maximum coverage
+    const MAX_RETRIES = 1; // Quick retry strategy
     console.log(`📊 Fetching up to ${BATCH_SIZE} domains to scan...`);
 
     const { data: domains, error: fetchError } = await supabase
@@ -207,12 +207,12 @@ Deno.serve(async (req) => {
         const scanUuid = scanData.result.uuid;
         console.log(`✓ Scan submitted for ${domain.indicator}, UUID: ${scanUuid}`);
 
-        // Wait and poll for results (max 60s)
-        const maxAttempts = 12; // 12 attempts * 5s = 60s
+        // Wait and poll for results (max 24s)
+        const maxAttempts = 8; // 8 attempts * 3s = 24s
         let result: ScanResult | null = null;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s between polls
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s between polls
 
           const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan/${scanUuid}`;
           const resultResponse = await fetch(resultUrl, {
@@ -301,8 +301,8 @@ Deno.serve(async (req) => {
 
         scanned++;
 
-        // Small delay between scans
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Minimal delay between scans for maximum throughput
+        await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error) {
         console.error(`Error processing ${domain.indicator}:`, error);
