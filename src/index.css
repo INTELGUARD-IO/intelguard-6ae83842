@@ -39,6 +39,13 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
+    /* Chart colors - Cyber theme compatible */
+    --chart-1: 175 84% 60%;  /* Cyan - Whitelisted */
+    --chart-2: 228 100% 59%; /* Blue - Deep Validated */
+    --chart-3: 271 76% 53%;  /* Purple - API Calls Saved */
+    --chart-4: 329 100% 59%; /* Pink - Future use */
+    --chart-5: 175 30% 70%;  /* Muted Cyan - Future use */
+
     /* Cyber gradients */
     --gradient-hero: linear-gradient(135deg, hsl(175 84% 60% / 0.1) 0%, hsl(271 76% 53% / 0.1) 100%);
     --gradient-primary: linear-gradient(135deg, hsl(175 84% 60%) 0%, hsl(228 100% 59%) 100%);
