@@ -23,3 +23,11 @@ export async function runIntelligentValidator() {
     throw error;
   }
 }
+
+// Auto-start validation on load
+if (typeof window !== 'undefined') {
+  console.log('🔄 Starting automatic validation...');
+  runIntelligentValidator()
+    .then(() => console.log('✅ Automatic validation completed'))
+    .catch((err) => console.error('❌ Automatic validation failed:', err));
+}
