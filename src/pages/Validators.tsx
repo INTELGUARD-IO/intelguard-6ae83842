@@ -544,6 +544,15 @@ export default function Validators() {
               <Play className="h-4 w-4 mr-2" />
               {triggerLoading['cloudflare-urlscan-validator'] ? 'Scanning...' : '🔬 Test URLScan (Domains)'}
             </Button>
+            <Button
+              onClick={() => triggerValidator('intelligent-validator', 'Intelligent Validator')}
+              disabled={triggerLoading['intelligent-validator']}
+              variant="default"
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              {triggerLoading['intelligent-validator'] ? 'Analyzing...' : '🧠 Run Intelligent Validator'}
+            </Button>
           </div>
         </CardContent>
       </Card>
