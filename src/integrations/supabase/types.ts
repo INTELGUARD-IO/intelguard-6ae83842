@@ -1638,6 +1638,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      safe_backfill_batch: {
+        Args: { batch_size?: number }
+        Returns: {
+          error_msg: string
+          processed: number
+          success: boolean
+        }[]
+      }
       snapshot_validated_indicators_to_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
