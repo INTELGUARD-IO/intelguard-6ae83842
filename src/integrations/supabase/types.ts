@@ -1227,6 +1227,48 @@ export type Database = {
         }
         Relationships: []
       }
+      validated_indicators_cache: {
+        Row: {
+          asn: string | null
+          confidence: number
+          country: string | null
+          created_at: string
+          id: string
+          indicator: string
+          kind: string
+          last_validated: string
+          snapshot_at: string
+          snapshot_hour: number
+          threat_type: string | null
+        }
+        Insert: {
+          asn?: string | null
+          confidence: number
+          country?: string | null
+          created_at?: string
+          id?: string
+          indicator: string
+          kind: string
+          last_validated: string
+          snapshot_at?: string
+          snapshot_hour?: number
+          threat_type?: string | null
+        }
+        Update: {
+          asn?: string | null
+          confidence?: number
+          country?: string | null
+          created_at?: string
+          id?: string
+          indicator?: string
+          kind?: string
+          last_validated?: string
+          snapshot_at?: string
+          snapshot_hour?: number
+          threat_type?: string | null
+        }
+        Relationships: []
+      }
       validation_jobs: {
         Row: {
           attempts: number
@@ -1593,6 +1635,10 @@ export type Database = {
         Returns: undefined
       }
       refresh_validator_stats_mv: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      snapshot_validated_indicators_to_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
