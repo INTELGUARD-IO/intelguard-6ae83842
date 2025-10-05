@@ -112,3 +112,13 @@ schedule = "0 2 * * *"
 [functions.domain-resolver-validator]
 verify_jwt = false
 schedule = "0 */6 * * *"
+
+[functions.trigger-domain-validation]
+verify_jwt = false
+
+[functions.snapshot-cache]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.backfill-indicators]
+verify_jwt = false

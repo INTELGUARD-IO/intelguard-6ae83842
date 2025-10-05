@@ -1634,6 +1634,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      priority_backfill_domains: {
+        Args: { batch_size?: number }
+        Returns: {
+          error_msg: string
+          processed: number
+          success: boolean
+        }[]
+      }
       refresh_validator_stats_mv: {
         Args: Record<PropertyKey, never>
         Returns: undefined
