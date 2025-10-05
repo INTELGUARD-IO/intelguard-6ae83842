@@ -9,8 +9,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET');
 
-// Rate limiting: 2 req/s max
-const RATE_LIMIT_MS = 500;
+// Rate limiting: relaxed to 750ms (1.33 req/s) to avoid OTX Gateway Timeouts
+const RATE_LIMIT_MS = 750;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface OTXGeneralResponse {
@@ -246,13 +246,14 @@ async function processIndicators() {
   console.log('🔍 OTX Validator: Starting validation process');
 
   // Get indicators that need OTX validation (not yet checked or TTL expired)
+  // Increased batch size from 100 to 500 for better throughput
   const indicators = await supabaseQuery(
     SUPABASE_URL,
     SUPABASE_SERVICE_KEY,
     'dynamic_raw_indicators',
     'GET',
     null,
-    '?select=indicator,kind&or=(otx_checked.eq.false,otx_checked.is.null)&limit=100'
+    '?select=indicator,kind,confidence&or=(otx_checked.eq.false,otx_checked.is.null)&limit=500'
   );
 
   if (!indicators || indicators.length === 0) {
@@ -335,7 +336,65 @@ async function processIndicators() {
         validated++;
       } catch (error: any) {
         console.error(`❌ Error fetching OTX data for ${indicator}:`, error.message);
-        continue;
+        
+        // Retry logic for HTTP 504 Gateway Timeout or general timeout errors
+        if (error.message.includes('504') || error.message.includes('Gateway Timeout') || error.message.includes('timeout')) {
+          console.log(`⏳ Retrying ${indicator} after 504/timeout error...`);
+          await sleep(2000); // Wait 2 seconds before retry
+          
+          try {
+            const otxData = await fetchOTXData(indicator, kind);
+            const general = otxData.general as OTXGeneralResponse;
+            const scoring = calculateScore(general, otxData.passive_dns, otxData.url_list);
+
+            const allTags = (general.pulse_info?.pulses || [])
+              .flatMap(p => p.tags || [])
+              .filter((v, i, a) => a.indexOf(v) === i);
+
+            const allAuthors = new Set(
+              (general.pulse_info?.pulses || []).map(p => p.author.username)
+            ).size;
+
+            const latestPulse = (general.pulse_info?.pulses || [])
+              .map(p => new Date(p.modified || p.created))
+              .sort((a, b) => b.getTime() - a.getTime())[0];
+
+            enrichment = {
+              indicator,
+              kind,
+              score: scoring.score,
+              verdict: scoring.verdict,
+              pulses_count: general.pulse_info?.count || 0,
+              authors_count: allAuthors,
+              latest_pulse: latestPulse ? latestPulse.toISOString() : null,
+              country: general.country_code || null,
+              asn: general.asn || null,
+              tags: allTags,
+              reasons: scoring.reasons,
+              raw_otx: otxData,
+              pulse_info: general.pulse_info || null,
+              passive_dns: otxData.passive_dns || null,
+              url_list: otxData.url_list || null,
+              refreshed_at: new Date().toISOString(),
+              ttl_seconds: 86400
+            };
+
+            await supabaseUpsert(
+              SUPABASE_URL,
+              SUPABASE_SERVICE_KEY,
+              'otx_enrichment',
+              [enrichment]
+            );
+
+            validated++;
+            console.log(`✅ Retry successful for ${indicator}`);
+          } catch (retryError: any) {
+            console.error(`❌ Retry failed for ${indicator}:`, retryError.message);
+            continue;
+          }
+        } else {
+          continue;
+        }
       }
     } else {
       console.log(`✅ Using cached OTX data for ${indicator}`);

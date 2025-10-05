@@ -59,6 +59,39 @@ export type Database = {
         }
         Relationships: []
       }
+      abuseipdb_quota: {
+        Row: {
+          created_at: string
+          daily_limit: number
+          date: string
+          id: string
+          last_reset_at: string
+          remaining_count: number | null
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          created_at?: string
+          daily_limit?: number
+          date?: string
+          id?: string
+          last_reset_at?: string
+          remaining_count?: number | null
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          created_at?: string
+          daily_limit?: number
+          date?: string
+          id?: string
+          last_reset_at?: string
+          remaining_count?: number | null
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       bgpview_enrichment: {
         Row: {
           asn: number | null
@@ -1468,6 +1501,17 @@ export type Database = {
           username: string
         }[]
       }
+      get_current_day_abuseipdb_quota: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          daily_limit: number
+          date: string
+          id: string
+          last_reset_at: string
+          remaining_count: number
+          used_count: number
+        }[]
+      }
       get_current_month_censys_usage: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1487,6 +1531,10 @@ export type Database = {
           unique_ipv4_count: number
           unique_sources_count: number
         }[]
+      }
+      increment_abuseipdb_usage: {
+        Args: { calls_count?: number }
+        Returns: undefined
       }
       increment_censys_usage: {
         Args: { calls_count?: number }

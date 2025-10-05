@@ -34,6 +34,35 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Step 0: Check daily quota before proceeding
+    console.log('[ABUSEIPDB] Step 0: Checking daily quota...');
+    const { data: quotaData, error: quotaError } = await supabase.rpc('get_current_day_abuseipdb_quota');
+    
+    if (quotaError) {
+      console.error('[ABUSEIPDB] Error checking quota:', quotaError);
+      throw new Error(`Failed to check quota: ${quotaError.message}`);
+    }
+
+    const quota = quotaData?.[0];
+    console.log(`[ABUSEIPDB] Daily quota status: ${quota.used_count}/${quota.daily_limit} calls used, ${quota.remaining_count} remaining`);
+
+    if (quota.remaining_count <= 0) {
+      console.error('[ABUSEIPDB] ❌ DAILY QUOTA EXHAUSTED. Aborting validation.');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Daily API quota exhausted', 
+          quota: {
+            daily_limit: quota.daily_limit,
+            used_count: quota.used_count,
+            remaining_count: quota.remaining_count
+          }
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[ABUSEIPDB] ✓ Step 0 Complete: Quota check passed');
+
     // Step 1: Clean expired entries
     console.log('[ABUSEIPDB] Step 1: Cleaning expired blacklist entries...');
     const { error: cleanError } = await supabase.rpc('clean_expired_abuseipdb_blacklist');
@@ -72,6 +101,14 @@ Deno.serve(async (req) => {
     const blacklistData: AbuseIPDBBlacklistResponse = await blacklistResponse.json();
     const duration = Date.now() - startTime;
     console.log(`[ABUSEIPDB] Fetched ${blacklistData.data.length} IPs from blacklist`);
+    
+    // Increment quota usage (1 API call made)
+    const { error: incrementError } = await supabase.rpc('increment_abuseipdb_usage', { calls_count: 1 });
+    if (incrementError) {
+      console.error('[ABUSEIPDB] Error incrementing quota:', incrementError);
+    } else {
+      console.log('[ABUSEIPDB] ✓ Quota incremented (1 call used)');
+    }
     
     if (networkLogId) {
       await updateNetworkLog(supabaseUrl, supabaseKey, networkLogId, {

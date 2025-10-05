@@ -46,7 +46,7 @@ verify_jwt = false
 
 [functions.abuseipdb-validator]
 verify_jwt = false
-schedule = "0 4 * * 0"
+schedule = "0 4 * * *"
 
 [functions.abuseipdb-enrich]
 verify_jwt = false
@@ -99,6 +99,7 @@ verify_jwt = false
 
 [functions.otx-validator]
 verify_jwt = false
+schedule = "0 */4 * * *"
 
 [functions.cloudflare-urlscan-validator]
 verify_jwt = false
