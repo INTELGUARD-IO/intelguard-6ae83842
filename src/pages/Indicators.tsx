@@ -22,9 +22,14 @@ interface Indicator {
   indicator: string;
   kind: string;
   confidence: number;
-  last_validated: string;
+  last_seen: string;
+  first_seen: string;
   country?: string;
   asn?: string;
+  asn_name?: string;
+  threat_type?: string;
+  severity?: string;
+  sources_count?: number;
 }
 
 export default function Indicators() {
@@ -41,9 +46,9 @@ export default function Indicators() {
     setLoading(true);
     try {
       let query = supabase
-        .from('validated_indicators')
+        .from('public_threat_indicators')
         .select('*')
-        .order('last_validated', { ascending: false })
+        .order('last_seen', { ascending: false })
         .limit(1000);
 
       if (activeTab !== 'all') {
@@ -69,14 +74,19 @@ export default function Indicators() {
     const ipv4Indicators = indicators.filter(ind => ind.kind === 'ipv4');
     
     const csv = [
-      ['IPv4 Address', 'Confidence', 'Last Validated', 'Country', 'ASN'].join(','),
+      ['IPv4 Address', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','),
       ...ipv4Indicators.map(ind =>
         [
           ind.indicator,
           ind.confidence,
-          new Date(ind.last_validated).toISOString(),
+          ind.threat_type || '',
+          ind.severity || '',
           ind.country || '',
           ind.asn || '',
+          ind.asn_name || '',
+          ind.sources_count || 0,
+          new Date(ind.first_seen).toISOString(),
+          new Date(ind.last_seen).toISOString(),
         ].join(',')
       ),
     ].join('\n');
@@ -93,14 +103,19 @@ export default function Indicators() {
     const domainIndicators = indicators.filter(ind => ind.kind === 'domain');
     
     const csv = [
-      ['Domain', 'Confidence', 'Last Validated', 'Country', 'ASN'].join(','),
+      ['Domain', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','),
       ...domainIndicators.map(ind =>
         [
           ind.indicator,
           ind.confidence,
-          new Date(ind.last_validated).toISOString(),
+          ind.threat_type || '',
+          ind.severity || '',
           ind.country || '',
           ind.asn || '',
+          ind.asn_name || '',
+          ind.sources_count || 0,
+          new Date(ind.first_seen).toISOString(),
+          new Date(ind.last_seen).toISOString(),
         ].join(',')
       ),
     ].join('\n');
@@ -187,16 +202,19 @@ export default function Indicators() {
                       <TableRow>
                         <TableHead>Indicator</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead>Threat Type</TableHead>
+                        <TableHead>Severity</TableHead>
                         <TableHead>Confidence</TableHead>
                         <TableHead>Country</TableHead>
                         <TableHead>ASN</TableHead>
-                        <TableHead>Last Validated</TableHead>
+                        <TableHead>Sources</TableHead>
+                        <TableHead>Last Seen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredIndicators.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             No indicators found
                           </TableCell>
                         </TableRow>
@@ -212,15 +230,31 @@ export default function Indicators() {
                               </Badge>
                             </TableCell>
                             <TableCell>
+                              <Badge variant="outline">
+                                {ind.threat_type || 'unknown'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  ind.severity === 'critical' ? 'destructive' :
+                                  ind.severity === 'high' ? 'default' :
+                                  'secondary'
+                                }
+                              >
+                                {ind.severity || 'low'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center gap-2">
                                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-primary"
-                                    style={{ width: `${ind.confidence * 100}%` }}
+                                    style={{ width: `${(ind.confidence || 0) * 100}%` }}
                                   />
                                 </div>
                                 <span className="text-sm text-muted-foreground">
-                                  {(ind.confidence * 100).toFixed(0)}%
+                                  {((ind.confidence || 0) * 100).toFixed(0)}%
                                 </span>
                               </div>
                             </TableCell>
@@ -228,8 +262,13 @@ export default function Indicators() {
                             <TableCell className="font-mono text-sm">
                               {ind.asn || '-'}
                             </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">
+                                {ind.sources_count || 0}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {new Date(ind.last_validated).toLocaleDateString()}
+                              {new Date(ind.last_seen).toLocaleDateString()}
                             </TableCell>
                           </TableRow>
                         ))

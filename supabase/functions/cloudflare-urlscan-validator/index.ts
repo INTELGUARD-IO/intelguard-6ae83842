@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Fetch domains to scan
-    const BATCH_SIZE = 50; // Increased batch size for better throughput
+    const BATCH_SIZE = 200; // Increased batch size for faster coverage
     const MAX_RETRIES = 2; // Max retry attempts per scan
     console.log(`📊 Fetching up to ${BATCH_SIZE} domains to scan...`);
 
