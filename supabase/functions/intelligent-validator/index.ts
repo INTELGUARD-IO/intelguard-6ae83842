@@ -82,11 +82,6 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Set statement timeout to 45 seconds
-    await supabase.rpc('execute', { 
-      query: 'SET statement_timeout = 45000' 
-    }).catch(() => console.log('[intelligent-validator] ⚠️ Could not set statement_timeout'));
-
     // Get kind from request body (default to 'domain' for first runs)
     const body = await req.json().catch(() => ({}));
     const kindFilter = body.kind || 'domain';
