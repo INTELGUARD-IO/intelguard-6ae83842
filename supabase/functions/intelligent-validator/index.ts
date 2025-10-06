@@ -272,10 +272,14 @@ Deno.serve(async (req) => {
       const totalVotes = votes.length;
       const consensusThreshold = indicator.kind === 'domain' ? 1 : 2; // 1 per domini, 2 per IP
 
-      // Promotion logic con advanced scoring
+      // Promotion logic con advanced scoring + soglia ridotta per domini da fonti affidabili
+      const isFromMaliciousFeed = indicator.source_count >= 3; // URLhaus, PhishTank, ecc.
+      const confidenceThreshold = (indicator.kind === 'domain' && isFromMaliciousFeed) ? 65 : 70;
+      const scoreThreshold = (indicator.kind === 'domain' && isFromMaliciousFeed) ? 65 : 75;
+      
       const shouldPromote = 
         (maliciousVotes >= consensusThreshold && totalVotes >= 2) || // Standard consensus
-        (advancedScore >= 75 && indicator.confidence >= 70); // High advanced score + high confidence
+        (advancedScore >= scoreThreshold && indicator.confidence >= confidenceThreshold); // High advanced score + confidence (ridotto per domini da feed malicious)
 
       if (shouldPromote) {
         // PROMOTE TO VALIDATED!
