@@ -82,14 +82,26 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch indicators with validator results
-    console.log('[intelligent-validator] 📊 Fetching indicators with validator results...');
+    // Set statement timeout to 45 seconds
+    await supabase.rpc('execute', { 
+      query: 'SET statement_timeout = 45000' 
+    }).catch(() => console.log('[intelligent-validator] ⚠️ Could not set statement_timeout'));
+
+    // Get kind from request body (default to 'domain' for first runs)
+    const body = await req.json().catch(() => ({}));
+    const kindFilter = body.kind || 'domain';
+    
+    console.log(`[intelligent-validator] 📊 Fetching ${kindFilter} indicators with validator results...`);
+    
+    // Fetch indicators with validator results (OPTIMIZED: LIMIT 500, ordered by last_validated)
     const { data: indicators, error: fetchError } = await supabase
       .from('dynamic_raw_indicators')
       .select('*')
+      .eq('kind', kindFilter)  // Filter by kind (domain or ipv4)
       .gte('confidence', 50)  // Only process indicators with decent confidence
       .eq('whitelisted', false)  // Exclude whitelisted
-      .limit(10000);
+      .order('last_validated', { ascending: true, nullsFirst: true })  // Process unvalidated first
+      .limit(500);  // OPTIMIZATION: Max 500 indicators per run
 
     if (fetchError) {
       throw new Error(`Failed to fetch indicators: ${fetchError.message}`);
