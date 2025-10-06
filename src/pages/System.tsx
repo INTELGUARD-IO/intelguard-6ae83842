@@ -33,6 +33,7 @@ const edgeFunctions: EdgeFunction[] = [
   { name: 'schedule-validations', title: 'Schedule Validations', category: 'Data Pipeline', description: 'Creates validation jobs for recently updated indicators', icon: Clock },
   { name: 'run-validations', title: 'Run Validations', category: 'Data Pipeline', description: 'Executes queued validation tasks against vendor APIs', icon: Activity },
   { name: 'daily-delta', title: 'Daily Delta', category: 'Data Pipeline', description: 'Calculate daily changes in indicator counts and statistics', icon: TrendingUp },
+  { name: 'intelligent-validator', title: 'Intelligent Validator', category: 'Data Pipeline', description: 'Promuove domini con confidence ≥ 65% da dynamic_raw_indicators a validated_indicators', icon: Database },
   
   // Validators
   { name: 'abuse-ch-validator', title: 'Abuse.ch Validator', category: 'Validators', description: 'Checks indicators against Abuse.ch False Positive list', icon: Shield },
