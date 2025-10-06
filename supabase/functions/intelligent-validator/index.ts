@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
       );
 
       // Direct promotion for abuse.ch domains (trusted malware source)
-      if (indicator.kind === 'domain' && isFromAbuseCh && indicator.confidence >= 60) {
+      if (indicator.kind === 'domain' && isFromAbuseCh && indicator.confidence >= 65) {
         console.log(`[intelligent-validator] ✅ DIRECT PROMOTION (Abuse.ch): ${indicator.indicator} - Confidence: ${indicator.confidence}%`);
         
         // Fetch enrichment data per country/asn
