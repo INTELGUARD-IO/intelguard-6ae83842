@@ -116,8 +116,40 @@ Deno.serve(async (req) => {
 
     // Layer 2: Fetch from DB cache via optimized RPC
     console.log('[CACHE MISS] Fetching from DB cache...');
+    // Layer 2: Fetch with triple fallback strategy (cache → validated → emergency)
     const { data: indicators, error: indicatorsError } = await perf.trackDbQuery(async () => {
-      return await supabase.rpc('get_feed_indicators', { p_kind: kind });
+      // Layer 2a: Try cache snapshot (preferred)
+      const { data: cachedData } = await supabase.rpc('get_feed_indicators', { p_kind: kind });
+      
+      if (cachedData && cachedData.length > 0) {
+        console.log(`[DB CACHE HIT] ${cachedData.length} indicators from cache`);
+        return { data: cachedData, error: null };
+      }
+      
+      // Layer 2b: Fallback to validated_indicators if cache is empty
+      console.log('[DB CACHE MISS] Falling back to validated_indicators...');
+      const { data: liveData, error } = await supabase
+        .from('validated_indicators')
+        .select('indicator')
+        .eq('kind', kind)
+        .gte('confidence', 70);
+      
+      if (liveData && liveData.length > 0) {
+        console.log(`[LIVE DATA] ${liveData.length} indicators from validated_indicators`);
+        return { data: liveData, error: null };
+      }
+      
+      // Layer 2c: Emergency fallback to dynamic_raw_indicators
+      console.log('[EMERGENCY FALLBACK] Using dynamic_raw_indicators...');
+      const { data: emergencyData, error: emergencyError } = await supabase
+        .from('dynamic_raw_indicators')
+        .select('indicator')
+        .eq('kind', kind)
+        .gte('confidence', 70)
+        .eq('whitelisted', false)
+        .limit(10000);
+      
+      return { data: emergencyData || [], error: emergencyError };
     });
 
     if (indicatorsError) {
