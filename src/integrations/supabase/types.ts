@@ -1227,6 +1227,42 @@ export type Database = {
         }
         Relationships: []
       }
+      validated_indicators: {
+        Row: {
+          asn: string | null
+          confidence: number
+          country: string | null
+          created_at: string
+          id: string
+          indicator: string
+          kind: string
+          last_validated: string
+          threat_type: string | null
+        }
+        Insert: {
+          asn?: string | null
+          confidence: number
+          country?: string | null
+          created_at?: string
+          id?: string
+          indicator: string
+          kind: string
+          last_validated?: string
+          threat_type?: string | null
+        }
+        Update: {
+          asn?: string | null
+          confidence?: number
+          country?: string | null
+          created_at?: string
+          id?: string
+          indicator?: string
+          kind?: string
+          last_validated?: string
+          threat_type?: string | null
+        }
+        Relationships: []
+      }
       validated_indicators_cache: {
         Row: {
           asn: string | null
@@ -1419,30 +1455,6 @@ export type Database = {
           unique_domain_count: number | null
           unique_ipv4_count: number | null
           unique_sources_count: number | null
-        }
-        Relationships: []
-      }
-      validated_indicators: {
-        Row: {
-          confidence: number | null
-          indicator: string | null
-          kind: string | null
-          last_validated: string | null
-          threat_type: string | null
-        }
-        Insert: {
-          confidence?: number | null
-          indicator?: string | null
-          kind?: string | null
-          last_validated?: string | null
-          threat_type?: never
-        }
-        Update: {
-          confidence?: number | null
-          indicator?: string | null
-          kind?: string | null
-          last_validated?: string | null
-          threat_type?: never
         }
         Relationships: []
       }
