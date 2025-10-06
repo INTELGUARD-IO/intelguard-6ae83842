@@ -69,17 +69,13 @@ export default function Threats() {
     setLoading(true);
     try {
       let query = supabase
-        .from('public_threat_indicators')
+        .from('validated_indicators')
         .select('*')
-        .order('last_seen', { ascending: false })
+        .order('last_validated', { ascending: false })
         .limit(1000);
 
       if (activeTab !== 'all') {
         query = query.eq('kind', activeTab);
-      }
-
-      if (severityFilter !== 'all') {
-        query = query.eq('severity', severityFilter);
       }
 
       if (threatTypeFilter !== 'all') {
@@ -90,17 +86,45 @@ export default function Threats() {
 
       if (error) throw error;
       
-      const threatData = (data || []) as ThreatIndicator[];
-      setThreats(threatData);
+      // Map and enrich data
+      const threatData: ThreatIndicator[] = (data || []).map((item: any) => {
+        // Calculate severity based on confidence
+        let severity: 'critical' | 'high' | 'medium' | 'low';
+        if (item.confidence >= 90) severity = 'critical';
+        else if (item.confidence >= 80) severity = 'high';
+        else if (item.confidence >= 70) severity = 'medium';
+        else severity = 'low';
+
+        return {
+          indicator: item.indicator,
+          kind: item.kind,
+          confidence: item.confidence,
+          threat_type: item.threat_type || 'unknown',
+          country: item.country || '',
+          asn: item.asn || '',
+          asn_name: '',
+          last_seen: item.last_validated,
+          first_seen: item.last_validated,
+          sources_count: 1,
+          severity
+        };
+      });
+
+      // Apply severity filter if needed
+      const filteredData = severityFilter !== 'all' 
+        ? threatData.filter(t => t.severity === severityFilter)
+        : threatData;
+
+      setThreats(filteredData);
 
       // Calculate stats
       setStats({
-        total: threatData.length,
-        critical: threatData.filter(t => t.severity === 'critical').length,
-        high: threatData.filter(t => t.severity === 'high').length,
-        medium: threatData.filter(t => t.severity === 'medium').length,
-        ipv4: threatData.filter(t => t.kind === 'ipv4').length,
-        domains: threatData.filter(t => t.kind === 'domain').length,
+        total: filteredData.length,
+        critical: filteredData.filter(t => t.severity === 'critical').length,
+        high: filteredData.filter(t => t.severity === 'high').length,
+        medium: filteredData.filter(t => t.severity === 'medium').length,
+        ipv4: filteredData.filter(t => t.kind === 'ipv4').length,
+        domains: filteredData.filter(t => t.kind === 'domain').length,
       });
     } catch (error) {
       console.error('Error loading threats:', error);
