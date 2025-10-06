@@ -1227,36 +1227,6 @@ export type Database = {
         }
         Relationships: []
       }
-      validated_indicators: {
-        Row: {
-          asn: string | null
-          confidence: number
-          country: string | null
-          indicator: string
-          kind: string
-          last_validated: string
-          threat_type: string | null
-        }
-        Insert: {
-          asn?: string | null
-          confidence: number
-          country?: string | null
-          indicator: string
-          kind: string
-          last_validated?: string
-          threat_type?: string | null
-        }
-        Update: {
-          asn?: string | null
-          confidence?: number
-          country?: string | null
-          indicator?: string
-          kind?: string
-          last_validated?: string
-          threat_type?: string | null
-        }
-        Relationships: []
-      }
       validated_indicators_cache: {
         Row: {
           asn: string | null
@@ -1440,41 +1410,6 @@ export type Database = {
         }
         Relationships: []
       }
-      dashboard_stats_mv: {
-        Row: {
-          asn_count: number | null
-          countries_count: number | null
-          kind: string | null
-          validated_count: number | null
-        }
-        Relationships: []
-      }
-      enrichment_summary: {
-        Row: {
-          asn: string | null
-          asn_name: string | null
-          country: string | null
-          indicator: string | null
-          kind: string | null
-        }
-        Relationships: []
-      }
-      public_threat_indicators: {
-        Row: {
-          asn: string | null
-          asn_name: string | null
-          confidence: number | null
-          country: string | null
-          first_seen: string | null
-          indicator: string | null
-          kind: string | null
-          last_seen: string | null
-          severity: string | null
-          sources_count: number | null
-          threat_type: string | null
-        }
-        Relationships: []
-      }
       raw_indicator_stats_mv: {
         Row: {
           domain_count: number | null
@@ -1484,6 +1419,30 @@ export type Database = {
           unique_domain_count: number | null
           unique_ipv4_count: number | null
           unique_sources_count: number | null
+        }
+        Relationships: []
+      }
+      validated_indicators: {
+        Row: {
+          confidence: number | null
+          indicator: string | null
+          kind: string | null
+          last_validated: string | null
+          threat_type: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          indicator?: string | null
+          kind?: string | null
+          last_validated?: string | null
+          threat_type?: never
+        }
+        Update: {
+          confidence?: number | null
+          indicator?: string | null
+          kind?: string | null
+          last_validated?: string | null
+          threat_type?: never
         }
         Relationships: []
       }
@@ -1602,6 +1561,12 @@ export type Database = {
         Args: { p_kind: string }
         Returns: number
       }
+      emergency_cleanup_connections: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          killed_count: number
+        }[]
+      }
       get_cron_jobs: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1661,6 +1626,7 @@ export type Database = {
           kind: string
           last_validated: string
           threat_type: string
+          total_count: number
         }[]
       }
       get_raw_indicator_stats: {

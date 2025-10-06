@@ -30,6 +30,7 @@ interface Indicator {
   threat_type?: string;
   severity?: string;
   sources_count?: number;
+  total_count?: number;
 }
 
 export default function Indicators() {
@@ -39,6 +40,9 @@ export default function Indicators() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedKind, setSelectedKind] = useState<'all' | 'ipv4' | 'domain'>('all');
+  const [ipv4Count, setIpv4Count] = useState(0);
+  const [domainCount, setDomainCount] = useState(0);
   const pageSize = 100;
 
   // Debounce search input (300ms)
@@ -52,8 +56,32 @@ export default function Indicators() {
   }, [searchTerm]);
 
   useEffect(() => {
+    loadCounts();
+  }, []);
+
+  useEffect(() => {
     loadIndicators();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, selectedKind]);
+
+  const loadCounts = async () => {
+    try {
+      const [
+        { data: allData },
+        { data: ipv4Data },
+        { data: domainData }
+      ] = await Promise.all([
+        supabase.rpc('get_paginated_indicators', { p_kind: null, p_page: 1, p_limit: 1 }),
+        supabase.rpc('get_paginated_indicators', { p_kind: 'ipv4', p_page: 1, p_limit: 1 }),
+        supabase.rpc('get_paginated_indicators', { p_kind: 'domain', p_page: 1, p_limit: 1 })
+      ]);
+      
+      setTotalCount(allData?.[0]?.total_count || 0);
+      setIpv4Count(ipv4Data?.[0]?.total_count || 0);
+      setDomainCount(domainData?.[0]?.total_count || 0);
+    } catch (error) {
+      console.error('Error loading counts:', error);
+    }
+  };
 
   const loadIndicators = async () => {
     setLoading(true);
@@ -61,7 +89,7 @@ export default function Indicators() {
       // Use server-side pagination RPC
       const { data, error } = await supabase
         .rpc('get_paginated_indicators', {
-          p_kind: null,
+          p_kind: selectedKind === 'all' ? null : selectedKind,
           p_page: page,
           p_limit: pageSize
         });
@@ -76,7 +104,18 @@ export default function Indicators() {
       }));
       
       setIndicators(mappedData);
-      setTotalCount(data?.length || 0);
+      
+      // Update total count based on current filter
+      if (data && data.length > 0) {
+        const currentCount = data[0].total_count || 0;
+        if (selectedKind === 'all') {
+          setTotalCount(currentCount);
+        } else if (selectedKind === 'ipv4') {
+          setIpv4Count(currentCount);
+        } else if (selectedKind === 'domain') {
+          setDomainCount(currentCount);
+        }
+      }
     } catch (error) {
       console.error('Error loading indicators:', error);
     } finally {
@@ -92,7 +131,13 @@ export default function Indicators() {
     );
   }, [indicators, debouncedSearch]);
 
-  const totalPages = Math.ceil(totalCount / pageSize);
+  const currentCount = selectedKind === 'all' ? totalCount : selectedKind === 'ipv4' ? ipv4Count : domainCount;
+  const totalPages = Math.ceil(currentCount / pageSize);
+
+  const handleKindChange = (kind: string) => {
+    setSelectedKind(kind as 'all' | 'ipv4' | 'domain');
+    setPage(1);
+  };
 
   const exportIPv4 = () => {
     const ipv4Indicators = indicators.filter(ind => ind.kind === 'ipv4');
@@ -181,15 +226,24 @@ export default function Indicators() {
 
       <Card>
         <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Indicators Database</CardTitle>
+              <CardDescription>
+                Page {page} of {totalPages} | Total: {currentCount.toLocaleString()} indicators | 
+                Showing: {filteredIndicators.length}
+              </CardDescription>
+            </div>
+            <Tabs value={selectedKind} onValueChange={handleKindChange} className="w-auto">
+              <TabsList>
+                <TabsTrigger value="all">All ({totalCount.toLocaleString()})</TabsTrigger>
+                <TabsTrigger value="ipv4">IPv4 ({ipv4Count.toLocaleString()})</TabsTrigger>
+                <TabsTrigger value="domain">Domains ({domainCount.toLocaleString()})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="mt-4">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Indicators Database</CardTitle>
-                <CardDescription>
-                  Page {page} of {totalPages} | Total: {totalCount.toLocaleString()} indicators | 
-                  Showing: {filteredIndicators.length}
-                </CardDescription>
-              </div>
-            <div className="flex items-center gap-2">
               <div className="relative w-[300px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
