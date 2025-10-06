@@ -272,6 +272,38 @@ Deno.serve(async (req) => {
       const totalVotes = votes.length;
       const consensusThreshold = indicator.kind === 'domain' ? 1 : 2; // 1 per domini, 2 per IP
 
+      // ✨ SPECIAL LOGIC: Trust abuse.ch sources directly for domains
+      const isFromAbuseCh = indicator.sources?.some((s: string) => 
+        s.toLowerCase().includes('abuse.ch') || 
+        s.toLowerCase().includes('urlhaus') || 
+        s.toLowerCase().includes('threatfox')
+      );
+
+      // Direct promotion for abuse.ch domains (trusted malware source)
+      if (indicator.kind === 'domain' && isFromAbuseCh && indicator.confidence >= 60) {
+        console.log(`[intelligent-validator] ✅ DIRECT PROMOTION (Abuse.ch): ${indicator.indicator} - Confidence: ${indicator.confidence}%`);
+        
+        // Fetch enrichment data per country/asn
+        const enrichment = await supabase
+          .from('ripestat_enrichment')
+          .select('country_code, asn')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .maybeSingle();
+
+        toPromote.push({
+          indicator: indicator.indicator,
+          kind: indicator.kind,
+          confidence: indicator.confidence,
+          threat_type: 'malware', // abuse.ch è principalmente malware distribution
+          country: enrichment?.data?.country_code || null,
+          asn: enrichment?.data?.asn?.toString() || null,
+          last_validated: new Date().toISOString(),
+        });
+        promotedDomains++;
+        continue; // Skip normal validation logic
+      }
+
       // Promotion logic con advanced scoring + soglia ridotta per domini da fonti affidabili
       const isFromMaliciousFeed = indicator.source_count >= 3; // URLhaus, PhishTank, ecc.
       const confidenceThreshold = (indicator.kind === 'domain' && isFromMaliciousFeed) ? 65 : 70;
