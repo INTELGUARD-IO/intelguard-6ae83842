@@ -93,11 +93,11 @@ export const ValidatorStatsCard = () => {
             
             return (
               <div key={validator.key} className="space-y-3 p-4 border rounded-lg">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium whitespace-nowrap">{validator.name}</span>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">{validator.name}</span>
                   <Badge 
                     variant={detectionRate > 10 ? 'destructive' : detectionRate > 5 ? 'secondary' : 'outline'}
-                    className="shrink-0"
+                    className="w-fit"
                   >
                     {detectionRate >= 10 
                       ? `${Math.round(detectionRate)}%` 
