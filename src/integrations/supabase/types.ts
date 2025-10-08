@@ -1682,14 +1682,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      pause_all_validators: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          action: string
-          jobname: string
-          message: string
-        }[]
-      }
       priority_backfill_domains: {
         Args: { batch_size?: number }
         Returns: {

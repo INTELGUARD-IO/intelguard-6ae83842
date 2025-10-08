@@ -29,7 +29,7 @@
 
 ## Architecture Overview
 
-```mermaid
+\`\`\`mermaid
 graph TB
     subgraph "INGESTION LAYER"
         A[ingest_sources] --> B[raw_indicators]
@@ -59,7 +59,7 @@ graph TB
         M --> O[customers]
         O --> K
     end
-```
+\`\`\`
 
 ---
 
@@ -82,13 +82,13 @@ graph TB
 **Primary Key**: `id`
 
 **Indexes**:
-```sql
+\`\`\`sql
 CREATE INDEX idx_raw_indicators_indicator ON raw_indicators(indicator);
 CREATE INDEX idx_raw_indicators_kind ON raw_indicators(kind);
 CREATE INDEX idx_raw_indicators_source ON raw_indicators(source);
 CREATE INDEX idx_raw_indicators_removed_at ON raw_indicators(removed_at) WHERE removed_at IS NULL;
 CREATE INDEX idx_raw_indicators_composite ON raw_indicators(indicator, kind, source) WHERE removed_at IS NULL;
-```
+\`\`\`
 
 **RLS Policies**:
 - `super_admin_can_view_raw_indicators` (SELECT): `is_super_admin(auth.uid())`
@@ -164,14 +164,14 @@ CREATE INDEX idx_raw_indicators_composite ON raw_indicators(indicator, kind, sou
 **Unique Constraint**: `(indicator, kind)`
 
 **Indexes**:
-```sql
+\`\`\`sql
 CREATE INDEX idx_dynamic_raw_indicators_indicator ON dynamic_raw_indicators(indicator);
 CREATE INDEX idx_dynamic_raw_indicators_kind ON dynamic_raw_indicators(kind);
 CREATE INDEX idx_dynamic_raw_indicators_confidence ON dynamic_raw_indicators(confidence DESC);
 CREATE INDEX idx_dynamic_raw_indicators_sources_confidence ON dynamic_raw_indicators(source_count DESC, confidence DESC) WHERE whitelisted = false;
 CREATE INDEX idx_dynamic_raw_indicators_validated ON dynamic_raw_indicators(last_validated DESC) WHERE confidence >= 50 AND whitelisted = false;
 CREATE INDEX idx_dynamic_raw_indicators_whitelisted ON dynamic_raw_indicators(whitelisted, whitelist_source) WHERE whitelisted = true;
-```
+\`\`\`
 
 **RLS Policies**:
 - `super_admin_full_access_dynamic_raw_indicators` (ALL): `is_super_admin(auth.uid())`
@@ -200,14 +200,14 @@ CREATE INDEX idx_dynamic_raw_indicators_whitelisted ON dynamic_raw_indicators(wh
 **Unique Constraint**: `(indicator, kind)`
 
 **Indexes**:
-```sql
+\`\`\`sql
 CREATE INDEX idx_validated_indicators_indicator ON validated_indicators(indicator);
 CREATE INDEX idx_validated_indicators_kind ON validated_indicators(kind);
 CREATE INDEX idx_validated_indicators_confidence ON validated_indicators(confidence DESC);
 CREATE INDEX idx_validated_indicators_threat_type ON validated_indicators(threat_type);
 CREATE INDEX idx_validated_indicators_country ON validated_indicators(country);
 CREATE INDEX idx_validated_indicators_last_validated ON validated_indicators(last_validated DESC);
-```
+\`\`\`
 
 **RLS Policies**:
 - `super_admin_full_access_validated_indicators` (ALL): `is_super_admin(auth.uid())`
@@ -245,11 +245,11 @@ CREATE INDEX idx_validated_indicators_last_validated ON validated_indicators(las
 **Primary Key**: `id`
 
 **Indexes**:
-```sql
+\`\`\`sql
 CREATE INDEX idx_validated_indicators_cache_kind_hour ON validated_indicators_cache(kind, snapshot_hour);
 CREATE INDEX idx_validated_indicators_cache_snapshot ON validated_indicators_cache(snapshot_hour, snapshot_at DESC);
 CREATE INDEX idx_validated_indicators_cache_indicator ON validated_indicators_cache(indicator);
-```
+\`\`\`
 
 **RLS Policies**:
 - `super_admin_full_access_validated_indicators_cache` (ALL): `is_super_admin(auth.uid())`
@@ -652,7 +652,7 @@ CREATE INDEX idx_validated_indicators_cache_indicator ON validated_indicators_ca
 **Unique Constraint**: `token`
 
 **RLS Policies**:
-```sql
+\`\`\`sql
 -- Complex policy: different logic for tenant vs customer tokens
 CASE 
   WHEN customer_id IS NULL THEN 
@@ -661,7 +661,7 @@ CASE
     EXISTS (SELECT 1 FROM customers c JOIN tenant_members tm ON tm.tenant_id = c.tenant_id 
             WHERE c.id = feed_tokens.customer_id AND tm.user_id = auth.uid())
 END
-```
+\`\`\`
 
 ---
 
@@ -681,10 +681,10 @@ END
 **Primary Key**: `id`
 
 **Indexes**:
-```sql
+\`\`\`sql
 CREATE INDEX idx_feed_access_logs_token ON feed_access_logs(token);
 CREATE INDEX idx_feed_access_logs_created_at ON feed_access_logs(created_at DESC);
-```
+\`\`\`
 
 **RLS Policies**:
 - `feed_access_logs_select` (SELECT): `EXISTS (SELECT 1 FROM feed_tokens ft JOIN tenant_members tm ON tm.tenant_id = ft.tenant_id WHERE ft.token = feed_access_logs.token AND tm.user_id = auth.uid())`
@@ -1041,11 +1041,11 @@ CREATE INDEX idx_feed_access_logs_created_at ON feed_access_logs(created_at DESC
 **Primary Key**: `id`
 
 **RLS Policies**:
-```sql
+\`\`\`sql
 -- User can access own tickets or tenant tickets
 (user_id = auth.uid()) OR 
 EXISTS (SELECT 1 FROM tenant_members WHERE tenant_id = support_tickets.tenant_id AND user_id = auth.uid())
-```
+\`\`\`
 
 ---
 
@@ -1140,9 +1140,9 @@ EXISTS (SELECT 1 FROM tenant_members WHERE tenant_id = support_tickets.tenant_id
 **Security**: `SECURITY DEFINER`, `STABLE`
 
 **Usage**:
-```sql
+\`\`\`sql
 SELECT is_super_admin(auth.uid());
-```
+\`\`\`
 
 ---
 
@@ -1151,19 +1151,19 @@ SELECT is_super_admin(auth.uid());
 **Purpose**: Check if user is member of tenant.
 
 **Logic**: 
-```sql
+\`\`\`sql
 SELECT EXISTS (
   SELECT 1 FROM public.tenant_members
   WHERE user_id = _user_id AND tenant_id = _tenant_id
 )
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`, `STABLE`
 
 **Usage**:
-```sql
+\`\`\`sql
 SELECT is_tenant_member(auth.uid(), 'tenant-uuid-here');
-```
+\`\`\`
 
 ---
 
@@ -1189,7 +1189,7 @@ SELECT is_tenant_member(auth.uid(), 'tenant-uuid-here');
 **Security**: `SECURITY DEFINER`
 
 **Example**:
-```sql
+\`\`\`sql
 SELECT merge_validator_result(
   '8.8.8.8',
   'ipv4',
@@ -1197,7 +1197,7 @@ SELECT merge_validator_result(
   75.0,
   '{"abuseipdb_checked": true, "abuseipdb_score": 80}'::jsonb
 );
-```
+\`\`\`
 
 ---
 
@@ -1255,14 +1255,14 @@ SELECT merge_validator_result(
 **Purpose**: Increment AbuseIPDB daily quota usage.
 
 **Logic**:
-```sql
+\`\`\`sql
 INSERT INTO abuseipdb_quota (date, used_count, last_reset_at)
 VALUES (CURRENT_DATE, calls_count, NOW())
 ON CONFLICT (date)
 DO UPDATE SET 
   used_count = abuseipdb_quota.used_count + calls_count,
   updated_at = NOW();
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`
 
@@ -1379,9 +1379,9 @@ DO UPDATE SET
 **Security**: `SECURITY DEFINER`, `STABLE`
 
 **Usage**:
-```sql
+\`\`\`sql
 SELECT * FROM get_feed_indicators('ipv4', 14); -- 2 PM snapshot
-```
+\`\`\`
 
 ---
 
@@ -1436,11 +1436,11 @@ SELECT * FROM get_feed_indicators('ipv4', 14); -- 2 PM snapshot
 - `p_kind`: 'ipv4' or 'domain'
 
 **Logic**:
-```sql
+\`\`\`sql
 SELECT COUNT(DISTINCT indicator)
 FROM public.raw_indicators
 WHERE kind = p_kind AND removed_at IS NULL
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`, `STABLE`
 
@@ -1519,9 +1519,9 @@ WHERE kind = p_kind AND removed_at IS NULL
 **Security**: `SECURITY DEFINER`
 
 **Usage**:
-```sql
+\`\`\`sql
 SELECT manual_unstuck_job('my-stuck-job');
-```
+\`\`\`
 
 ---
 
@@ -1532,13 +1532,13 @@ SELECT manual_unstuck_job('my-stuck-job');
 **Purpose**: Emergency cleanup of idle connections.
 
 **Logic**:
-```sql
+\`\`\`sql
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
 WHERE state = 'idle in transaction'
   AND state_change < NOW() - INTERVAL '2 minutes'
   AND pid != pg_backend_pid()
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`
 
@@ -1574,9 +1574,9 @@ WHERE state = 'idle in transaction'
 **Purpose**: Refresh validator_stats_mv materialized view.
 
 **Logic**:
-```sql
+\`\`\`sql
 REFRESH MATERIALIZED VIEW CONCURRENTLY validator_stats_mv;
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`
 
@@ -1589,10 +1589,10 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY validator_stats_mv;
 **Purpose**: Trigger function to auto-update updated_at column.
 
 **Logic**:
-```sql
+\`\`\`sql
 NEW.updated_at = now();
 RETURN NEW;
-```
+\`\`\`
 
 **Security**: `SECURITY DEFINER`
 
@@ -1607,14 +1607,14 @@ RETURN NEW;
 **Used on**: Most system tables
 
 **Policy**:
-```sql
+\`\`\`sql
 CREATE POLICY "super_admin_full_access_<table>"
 ON public.<table>
 FOR ALL
 TO authenticated
 USING (is_super_admin(auth.uid()))
 WITH CHECK (is_super_admin(auth.uid()));
-```
+\`\`\`
 
 ---
 
@@ -1623,7 +1623,7 @@ WITH CHECK (is_super_admin(auth.uid()));
 **Used on**: Reference and cache tables
 
 **Policy**:
-```sql
+\`\`\`sql
 CREATE POLICY "tenant_members_can_view_<table>"
 ON public.<table>
 FOR SELECT
@@ -1634,7 +1634,7 @@ USING (
     WHERE user_id = auth.uid()
   )
 );
-```
+\`\`\`
 
 ---
 
@@ -1643,7 +1643,7 @@ USING (
 **Used on**: customers, subscriptions
 
 **Policy**:
-```sql
+\`\`\`sql
 CREATE POLICY "<table>_rw"
 ON public.<table>
 FOR ALL
@@ -1662,7 +1662,7 @@ WITH CHECK (
       AND tm.user_id = auth.uid()
   )
 );
-```
+\`\`\`
 
 ---
 
@@ -1671,7 +1671,7 @@ WITH CHECK (
 **Used on**: email_preferences, system_audit_logs (partial)
 
 **Policy**:
-```sql
+\`\`\`sql
 CREATE POLICY "Users can view their own <table>"
 ON public.<table>
 FOR SELECT
@@ -1690,7 +1690,7 @@ FOR UPDATE
 TO authenticated
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
-```
+\`\`\`
 
 ---
 
@@ -1699,7 +1699,7 @@ WITH CHECK (auth.uid() = user_id);
 **Used on**: feed_tokens
 
 **Policy**:
-```sql
+\`\`\`sql
 CREATE POLICY "feed_tokens_rw"
 ON public.feed_tokens
 FOR ALL
@@ -1722,7 +1722,7 @@ USING (
       )
   END
 );
-```
+\`\`\`
 
 ---
 
@@ -1731,15 +1731,15 @@ USING (
 ### Critical Indexes
 
 #### `raw_indicators`
-```sql
+\`\`\`sql
 CREATE INDEX idx_raw_indicators_indicator ON raw_indicators(indicator);
 CREATE INDEX idx_raw_indicators_kind ON raw_indicators(kind);
 CREATE INDEX idx_raw_indicators_source ON raw_indicators(source);
 CREATE INDEX idx_raw_indicators_composite ON raw_indicators(indicator, kind, source) WHERE removed_at IS NULL;
-```
+\`\`\`
 
 #### `dynamic_raw_indicators`
-```sql
+\`\`\`sql
 CREATE INDEX idx_dynamic_raw_indicators_indicator ON dynamic_raw_indicators(indicator);
 CREATE INDEX idx_dynamic_raw_indicators_kind ON dynamic_raw_indicators(kind);
 CREATE INDEX idx_dynamic_raw_indicators_confidence ON dynamic_raw_indicators(confidence DESC);
@@ -1749,30 +1749,30 @@ CREATE INDEX idx_dynamic_raw_indicators_sources_confidence
 CREATE INDEX idx_dynamic_raw_indicators_validated 
   ON dynamic_raw_indicators(last_validated DESC) 
   WHERE confidence >= 50 AND whitelisted = false;
-```
+\`\`\`
 
 #### `validated_indicators`
-```sql
+\`\`\`sql
 CREATE INDEX idx_validated_indicators_indicator ON validated_indicators(indicator);
 CREATE INDEX idx_validated_indicators_kind ON validated_indicators(kind);
 CREATE INDEX idx_validated_indicators_confidence ON validated_indicators(confidence DESC);
 CREATE INDEX idx_validated_indicators_threat_type ON validated_indicators(threat_type);
 CREATE INDEX idx_validated_indicators_country ON validated_indicators(country);
-```
+\`\`\`
 
 #### `validated_indicators_cache`
-```sql
+\`\`\`sql
 CREATE INDEX idx_validated_indicators_cache_kind_hour 
   ON validated_indicators_cache(kind, snapshot_hour);
 CREATE INDEX idx_validated_indicators_cache_snapshot 
   ON validated_indicators_cache(snapshot_hour, snapshot_at DESC);
-```
+\`\`\`
 
 #### `feed_access_logs`
-```sql
+\`\`\`sql
 CREATE INDEX idx_feed_access_logs_token ON feed_access_logs(token);
 CREATE INDEX idx_feed_access_logs_created_at ON feed_access_logs(created_at DESC);
-```
+\`\`\`
 
 ---
 
@@ -1781,7 +1781,7 @@ CREATE INDEX idx_feed_access_logs_created_at ON feed_access_logs(created_at DESC
 **Purpose**: Indexes with WHERE clause for better performance on filtered queries.
 
 **Examples**:
-```sql
+\`\`\`sql
 -- Only index non-removed indicators
 CREATE INDEX idx_raw_indicators_removed_at 
   ON raw_indicators(removed_at) 
@@ -1796,7 +1796,7 @@ CREATE INDEX idx_dynamic_raw_indicators_validated
 CREATE INDEX idx_dynamic_raw_indicators_whitelisted 
   ON dynamic_raw_indicators(whitelisted, whitelist_source) 
   WHERE whitelisted = true;
-```
+\`\`\`
 
 ---
 
@@ -1805,7 +1805,7 @@ CREATE INDEX idx_dynamic_raw_indicators_whitelisted
 **Purpose**: For full-text search and array operations.
 
 **Examples**:
-```sql
+\`\`\`sql
 -- Array searches
 CREATE INDEX idx_dynamic_raw_indicators_sources 
   ON dynamic_raw_indicators USING GIN(sources);
@@ -1813,7 +1813,7 @@ CREATE INDEX idx_dynamic_raw_indicators_sources
 -- JSONB searches
 CREATE INDEX idx_otx_enrichment_pulse_info 
   ON otx_enrichment USING GIN(pulse_info);
-```
+\`\`\`
 
 ---
 
@@ -1821,7 +1821,7 @@ CREATE INDEX idx_otx_enrichment_pulse_info
 
 ### Entity Relationship Diagram
 
-```mermaid
+\`\`\`mermaid
 erDiagram
     tenants ||--o{ tenant_members : "has members"
     tenants ||--o{ customers : "has customers"
@@ -1841,7 +1841,7 @@ erDiagram
     validated_indicators ||--o{ ripestat_enrichment : "enriched by"
     validated_indicators ||--o{ cloudflare_radar_enrichment : "enriched by"
     validated_indicators ||--o{ domain_resolutions : "resolves to"
-```
+\`\`\`
 
 ---
 
@@ -1886,7 +1886,7 @@ erDiagram
 
 ### Indicator Processing Pipeline
 
-```mermaid
+\`\`\`mermaid
 flowchart TD
     A[External Feeds] -->|ingest| B[raw_indicators]
     B -->|backfill| C[dynamic_raw_indicators]
@@ -1899,13 +1899,13 @@ flowchart TD
     E -->|enrich| J[ripestat_enrichment]
     E -->|enrich| K[cloudflare_radar_enrichment]
     E -->|resolve| L[domain_resolutions]
-```
+\`\`\`
 
 ---
 
 ### Validation Flow
 
-```mermaid
+\`\`\`mermaid
 sequenceDiagram
     participant EF as Edge Function
     participant DRI as dynamic_raw_indicators
@@ -1933,13 +1933,13 @@ sequenceDiagram
     else Low confidence
         EF->>DRI: Update validation fields only
     end
-```
+\`\`\`
 
 ---
 
 ### Multi-Tenancy Access Control
 
-```mermaid
+\`\`\`mermaid
 graph LR
     U[User] -->|auth.uid()| TM[tenant_members]
     TM -->|tenant_id| T[tenants]
@@ -1954,7 +1954,7 @@ graph LR
     style C fill:#f5ffe1
     style FT fill:#e1ffe1
     style FAL fill:#ffe1e1
-```
+\`\`\`
 
 ---
 
@@ -1966,7 +1966,7 @@ graph LR
 
 **Important**: Always set `search_path = public` to prevent search path attacks:
 
-```sql
+\`\`\`sql
 CREATE OR REPLACE FUNCTION public.my_function()
 RETURNS void
 LANGUAGE plpgsql
@@ -1977,7 +1977,7 @@ BEGIN
   -- function logic
 END;
 $$;
-```
+\`\`\`
 
 ---
 
@@ -1996,22 +1996,22 @@ $$;
 **Always use security definer helper functions** for role checks to avoid infinite recursion:
 
 ❌ **Bad** (Infinite recursion):
-```sql
+\`\`\`sql
 CREATE POLICY "policy_name"
 ON public.profiles
 FOR SELECT
 USING (
   (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
 );
-```
+\`\`\`
 
 ✅ **Good** (Security definer function):
-```sql
+\`\`\`sql
 CREATE POLICY "policy_name"
 ON public.profiles
 FOR SELECT
 USING (public.has_role(auth.uid(), 'admin'));
-```
+\`\`\`
 
 ---
 
@@ -2021,12 +2021,12 @@ USING (public.has_role(auth.uid(), 'admin'));
 
 **Recommendation**: Add `ON DELETE CASCADE` for tenant relationships:
 
-```sql
+\`\`\`sql
 ALTER TABLE tenant_members
 ADD CONSTRAINT fk_tenant
 FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ON DELETE CASCADE;
-```
+\`\`\`
 
 ---
 
