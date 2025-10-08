@@ -22,7 +22,7 @@ This guide documents the comprehensive performance optimizations implemented in 
 
 ### Multi-Layer Caching Strategy
 
-```mermaid
+\`\`\`mermaid
 graph LR
     Client[Client Request] --> L1[Layer 1: In-Memory Cache]
     L1 -->|Cache Miss| L2[Layer 2: DB Cache Table]
@@ -34,7 +34,7 @@ graph LR
     style L1 fill:#00ff00
     style L2 fill:#ffff00
     style L3 fill:#ff0000
-```
+\`\`\`
 
 **Cache Layers:**
 
@@ -56,11 +56,11 @@ graph LR
 
 ### HTTP Caching
 
-```http
+\`\`\`http
 Cache-Control: public, s-maxage=60, stale-while-revalidate=300
 ETag: "ipv4-12"
 Last-Modified: Mon, 05 Oct 2025 12:00:00 GMT
-```
+\`\`\`
 
 - **CDN caching**: 60 seconds
 - **Stale-while-revalidate**: 5 minutes (serve stale during refresh)
@@ -78,7 +78,7 @@ Last-Modified: Mon, 05 Oct 2025 12:00:00 GMT
 - Feature flag: `ENABLE_FEED_CACHE`
 
 **Usage:**
-```typescript
+\`\`\`typescript
 import { feedCache } from '../_shared/feed-cache.ts';
 
 // Check cache
@@ -95,14 +95,14 @@ const data = await fetchFromDB();
 feedCache.set(cacheKey, data, 60); // TTL: 60s
 
 return new Response(data, { headers: cacheHeaders });
-```
+\`\`\`
 
 **Configuration:**
-```bash
+\`\`\`bash
 ENABLE_FEED_CACHE=true        # Enable/disable cache
 FEED_CACHE_TTL_SEC=60         # TTL in seconds
 FEED_CACHE_MAX_KEYS=100       # Max entries
-```
+\`\`\`
 
 ### 2. Optimized Serializers
 
@@ -119,7 +119,7 @@ FEED_CACHE_MAX_KEYS=100       # Max entries
 - CSV: ~20ms for 10K indicators
 
 **Usage:**
-```typescript
+\`\`\`typescript
 import { serializeToText, serializeToJSON, serializeToCSV } from '../_shared/serializers.ts';
 
 // Text format (most efficient)
@@ -130,7 +130,7 @@ const feedJSON = serializeToJSON({ indicators, metadata });
 
 // CSV format
 const feedCSV = serializeToCSV(indicators);
-```
+\`\`\`
 
 ### 3. Database Query Optimization
 
@@ -139,35 +139,35 @@ const feedCSV = serializeToCSV(indicators);
 **Key Changes:**
 
 #### A. Feed RPC (`get_feed_indicators`)
-```sql
+\`\`\`sql
 CREATE FUNCTION public.get_feed_indicators(
   p_kind TEXT,
   p_snapshot_hour INTEGER DEFAULT NULL
 )
 RETURNS TABLE(indicator TEXT)
-```
+\`\`\`
 
 - **Reads from cache table** (`validated_indicators_cache`)
 - **Zero overhead**: No joins, no filtering (pre-filtered)
 - **Query time**: ~20ms for 10K rows
 
 #### B. Composite Index
-```sql
+\`\`\`sql
 CREATE INDEX idx_feed_cache_kind_hour 
 ON validated_indicators_cache (kind, snapshot_hour) 
 INCLUDE (indicator);
-```
+\`\`\`
 
 - **BRIN index**: Fast range scans
 - **INCLUDE clause**: Index-only scan (no table lookup)
 
 #### C. Dashboard Materialized View
-```sql
+\`\`\`sql
 CREATE MATERIALIZED VIEW dashboard_stats_mv AS
 SELECT kind, COUNT(*), COUNT(DISTINCT country), COUNT(DISTINCT asn)
 FROM validated_indicators
 GROUP BY kind;
-```
+\`\`\`
 
 - **Pre-aggregated**: No COUNT() on every request
 - **Refreshed**: Every 5 minutes (cron)
@@ -183,7 +183,7 @@ GROUP BY kind;
 - Configurable window + max requests
 
 **Usage:**
-```typescript
+\`\`\`typescript
 import { rateLimiter } from '../_shared/rate-limiter.ts';
 
 const result = rateLimiter.checkLimit(token);
@@ -194,21 +194,21 @@ if (!result.allowed) {
     headers: rateLimiter.getRateLimitHeaders(result)
   });
 }
-```
+\`\`\`
 
 **Configuration:**
-```bash
+\`\`\`bash
 ENABLE_RATE_LIMIT=true          # Enable/disable rate limiting
 RATE_LIMIT_MAX_REQUESTS=100     # Max requests per window
 RATE_LIMIT_WINDOW_MS=60000      # Window duration (1 min)
-```
+\`\`\`
 
 **Headers:**
-```http
+\`\`\`http
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 2025-10-05T12:35:00Z
-```
+\`\`\`
 
 ### 5. Cache Pre-Warming
 
@@ -225,18 +225,18 @@ X-RateLimit-Reset: 2025-10-05T12:35:00Z
 **Schedule:** Every 15 minutes (cron)
 
 **Configuration:**
-```bash
+\`\`\`bash
 ENABLE_FEED_WARMUP=true
-```
+\`\`\`
 
 **Cron:**
-```sql
+\`\`\`sql
 SELECT cron.schedule(
   'feed-warmup-job',
   '5,20,35,50 * * * *',  -- Every 15 minutes
   $$...call feed-warmup function...$$
 );
-```
+\`\`\`
 
 ### 6. Performance Logging
 
@@ -249,7 +249,7 @@ SELECT cron.schedule(
 - Cache lookup time
 
 **Usage:**
-```typescript
+\`\`\`typescript
 import { createPerfTracker } from '../_shared/perf-logger.ts';
 
 const perf = createPerfTracker('feed-api', 'GET');
@@ -266,10 +266,10 @@ const feedText = perf.trackSerialization(() => {
 
 // Log final metrics
 perf.logPerf(200);
-```
+\`\`\`
 
 **Output:**
-```json
+\`\`\`json
 {
   "request_id": "a1b2c3d4-e5f6-...",
   "endpoint": "feed-api",
@@ -284,18 +284,18 @@ perf.logPerf(200);
   },
   "timestamp": "2025-10-05T12:34:56Z"
 }
-```
+\`\`\`
 
 **Configuration:**
-```bash
+\`\`\`bash
 PERF_LOG=true  # Enable detailed logging (default: false)
-```
+\`\`\`
 
 ## 📈 Monitoring
 
 ### Cache Hit Rate
 
-```typescript
+\`\`\`typescript
 // Check cache statistics
 const stats = feedCache.getStats();
 console.log(stats);
@@ -305,11 +305,11 @@ console.log(stats);
 //   enabled: true,
 //   ttlSeconds: 60
 // }
-```
+\`\`\`
 
 ### Database Query Analysis
 
-```sql
+\`\`\`sql
 -- Find slow queries (>100ms)
 SELECT 
   query,
@@ -319,11 +319,11 @@ FROM pg_stat_statements
 WHERE mean_exec_time > 100
 ORDER BY mean_exec_time DESC
 LIMIT 20;
-```
+\`\`\`
 
 ### Cache Table Usage
 
-```sql
+\`\`\`sql
 -- Analyze cache table effectiveness
 SELECT 
   snapshot_hour,
@@ -334,7 +334,7 @@ SELECT
 FROM validated_indicators_cache
 GROUP BY snapshot_hour, kind
 ORDER BY snapshot_hour DESC;
-```
+\`\`\`
 
 ## 🔍 Troubleshooting
 
@@ -348,11 +348,11 @@ ORDER BY snapshot_hour DESC;
 3. Verify warmup job running: `SELECT * FROM cron.job WHERE jobname = 'feed-warmup-job';`
 
 **Solution:**
-```bash
+\`\`\`bash
 # Manually trigger warmup
 curl -X POST "https://qmsidlazqaqwcptpsjqh.supabase.co/functions/v1/feed-warmup" \
   -H "x-cron-secret: INTELGUARD_Cr0N2025@2025"
-```
+\`\`\`
 
 ### High Latency on Cache Miss
 
@@ -378,7 +378,7 @@ curl -X POST "https://qmsidlazqaqwcptpsjqh.supabase.co/functions/v1/feed-warmup"
 **Symptom:** Dashboard shows stale statistics
 
 **Solution:**
-```sql
+\`\`\`sql
 -- Manual refresh
 REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv;
 
@@ -387,7 +387,7 @@ SELECT * FROM cron.job_run_details
 WHERE jobname = 'refresh-dashboard-stats-mv'
 ORDER BY start_time DESC
 LIMIT 10;
-```
+\`\`\`
 
 ## 🚀 Deployment Checklist
 
@@ -414,7 +414,7 @@ If issues occur:
 2. **Disable rate limiting**: `ENABLE_RATE_LIMIT=false`
 3. **Disable warmup**: `ENABLE_FEED_WARMUP=false`
 4. **Revert migration**:
-   ```sql
+   \`\`\`sql
    DROP FUNCTION IF EXISTS get_feed_indicators;
    DROP FUNCTION IF EXISTS get_dashboard_stats;
    DROP FUNCTION IF EXISTS get_paginated_indicators;
@@ -422,7 +422,7 @@ If issues occur:
    DROP INDEX IF EXISTS idx_feed_cache_kind_hour;
    SELECT cron.unschedule('refresh-dashboard-stats-mv');
    SELECT cron.unschedule('feed-warmup-job');
-   ```
+   \`\`\`
 
 ## 📚 References
 

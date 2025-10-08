@@ -17,7 +17,7 @@
 
 ### High-Level Architecture
 
-```mermaid
+\`\`\`mermaid
 graph TB
     subgraph "Frontend Layer"
         UI[React UI + TailwindCSS]
@@ -74,11 +74,11 @@ graph TB
     Intel --> Validated
     
     Dynamic --> Cache
-```
+\`\`\`
 
 ### Data Flow - Indicator Processing
 
-```mermaid
+\`\`\`mermaid
 sequenceDiagram
     participant Source as Ingest Source
     participant Raw as raw_indicators
@@ -112,7 +112,7 @@ sequenceDiagram
     Valid->>Cache: Hourly snapshot
     Feed->>Cache: Serve from cache
     Feed-->>Client: Return indicators
-```
+\`\`\`
 
 ---
 
@@ -123,7 +123,7 @@ sequenceDiagram
 #### `raw_indicators` (65,742 records)
 Primary ingestion table for all sources.
 
-```sql
+\`\`\`sql
 CREATE TABLE raw_indicators (
   id BIGSERIAL PRIMARY KEY,
   indicator TEXT NOT NULL,
@@ -137,7 +137,7 @@ CREATE TABLE raw_indicators (
 CREATE INDEX idx_raw_indicators_active 
 ON raw_indicators(indicator, kind) 
 WHERE removed_at IS NULL;
-```
+\`\`\`
 
 **RLS Policy:**
 - Super admin: Full access
@@ -146,7 +146,7 @@ WHERE removed_at IS NULL;
 #### `dynamic_raw_indicators` (1,949 records)
 Aggregated indicators with validation state.
 
-```sql
+\`\`\`sql
 CREATE TABLE dynamic_raw_indicators (
   id BIGSERIAL PRIMARY KEY,
   indicator TEXT NOT NULL,
@@ -200,12 +200,12 @@ CREATE TABLE dynamic_raw_indicators (
   
   UNIQUE(indicator, kind)
 );
-```
+\`\`\`
 
 #### `validated_indicators` (45 records → target: 10K+)
 Production-ready threat feed.
 
-```sql
+\`\`\`sql
 CREATE TABLE validated_indicators (
   indicator TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -217,12 +217,12 @@ CREATE TABLE validated_indicators (
   
   PRIMARY KEY (indicator, kind)
 );
-```
+\`\`\`
 
 ### Multi-Tenancy Schema
 
 #### `tenants`
-```sql
+\`\`\`sql
 CREATE TABLE tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -230,10 +230,10 @@ CREATE TABLE tenants (
   owner_user_id UUID NOT NULL REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+\`\`\`
 
 #### `tenant_members`
-```sql
+\`\`\`sql
 CREATE TABLE tenant_members (
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   user_id UUID NOT NULL REFERENCES auth.users(id),
@@ -241,20 +241,20 @@ CREATE TABLE tenant_members (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (tenant_id, user_id)
 );
-```
+\`\`\`
 
 #### `customers`
-```sql
+\`\`\`sql
 CREATE TABLE customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+\`\`\`
 
 #### `feed_tokens`
-```sql
+\`\`\`sql
 CREATE TABLE feed_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::TEXT,
@@ -264,12 +264,12 @@ CREATE TABLE feed_tokens (
   enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+\`\`\`
 
 ### Enrichment Tables
 
 #### `bgpview_enrichment`
-```sql
+\`\`\`sql
 CREATE TABLE bgpview_enrichment (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   indicator TEXT NOT NULL,
@@ -286,10 +286,10 @@ CREATE TABLE bgpview_enrichment (
   expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '24 hours',
   UNIQUE(indicator, kind)
 );
-```
+\`\`\`
 
 #### `otx_enrichment`
-```sql
+\`\`\`sql
 CREATE TABLE otx_enrichment (
   indicator TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -311,12 +311,12 @@ CREATE TABLE otx_enrichment (
   ttl_seconds INTEGER DEFAULT 86400,
   PRIMARY KEY (indicator, kind)
 );
-```
+\`\`\`
 
 ### Cache Tables
 
 #### `validated_indicators_cache`
-```sql
+\`\`\`sql
 CREATE TABLE validated_indicators_cache (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   indicator TEXT NOT NULL,
@@ -333,14 +333,14 @@ CREATE TABLE validated_indicators_cache (
 
 CREATE INDEX idx_cache_snapshot 
 ON validated_indicators_cache(snapshot_hour, kind);
-```
+\`\`\`
 
 **Purpose:** Serve feed API senza query pesanti su `validated_indicators`
 
 ### Quota Tracking Tables
 
 #### `abuseipdb_quota`
-```sql
+\`\`\`sql
 CREATE TABLE abuseipdb_quota (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   date DATE NOT NULL UNIQUE,
@@ -351,10 +351,10 @@ CREATE TABLE abuseipdb_quota (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+\`\`\`
 
 #### `censys_monthly_usage`
-```sql
+\`\`\`sql
 CREATE TABLE censys_monthly_usage (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   month DATE NOT NULL UNIQUE,  -- First day of month
@@ -362,7 +362,7 @@ CREATE TABLE censys_monthly_usage (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+\`\`\`
 
 ---
 
@@ -393,15 +393,15 @@ CREATE TABLE censys_monthly_usage (
 ### RLS Policy Patterns
 
 **Super Admin Full Access:**
-```sql
+\`\`\`sql
 CREATE POLICY "super_admin_full_access"
 ON table_name FOR ALL
 USING (is_super_admin(auth.uid()))
 WITH CHECK (is_super_admin(auth.uid()));
-```
+\`\`\`
 
 **Tenant Member Access:**
-```sql
+\`\`\`sql
 CREATE POLICY "tenant_members_view"
 ON table_name FOR SELECT
 USING (
@@ -411,18 +411,18 @@ USING (
     AND user_id = auth.uid()
   )
 );
-```
+\`\`\`
 
 **Token-Based Feed Access (Bypass RLS):**
-```sql
+\`\`\`sql
 -- Edge function usa service_role_key
 -- Valida token in feed_tokens table
 -- Nessuna RLS policy su feed API
-```
+\`\`\`
 
 ### Authentication Flow
 
-```mermaid
+\`\`\`mermaid
 sequenceDiagram
     participant User
     participant UI
@@ -457,7 +457,7 @@ sequenceDiagram
         Database-->>Edge Function: Filtered data
         Edge Function-->>UI: Response
     end
-```
+\`\`\`
 
 ---
 
@@ -470,7 +470,7 @@ sequenceDiagram
 **Schedule:** Every 6 hours via cron
 **Quota Impact:** None (pulls from public sources)
 
-```typescript
+\`\`\`typescript
 // supabase/functions/ingest/index.ts
 interface IngestResult {
   source_id: string;
@@ -479,19 +479,19 @@ interface IngestResult {
   duplicates: number;
   errors: string[];
 }
-```
+\`\`\`
 
 #### `manual-ingest`
 **Purpose:** Admin manual upload
 **Auth:** Requires super admin JWT
 **Payload:**
-```json
+\`\`\`json
 {
   "indicators": [
     {"indicator": "1.2.3.4", "kind": "ipv4", "source": "manual"}
   ]
 }
-```
+\`\`\`
 
 ### Validation Functions (10+ Validators)
 
@@ -500,104 +500,104 @@ interface IngestResult {
 **Quota:** Unlimited
 **Logic:** Check false positive list
 
-```typescript
+\`\`\`typescript
 // Checks abuse_ch_fplist table
 // Sets: abuse_ch_checked, abuse_ch_is_fp
-```
+\`\`\`
 
 #### `abuseipdb-validator`
 **API:** https://api.abuseipdb.com/api/v2/blacklist
 **Quota:** 1000 calls/day
 **Logic:** Check IP against blacklist (confidence >= 70)
 
-```typescript
+\`\`\`typescript
 // 1. Check daily quota
 // 2. Fetch blacklist (1 API call)
 // 3. Match local indicators
 // Sets: abuseipdb_checked, abuseipdb_score, abuseipdb_in_blacklist
-```
+\`\`\`
 
 #### `google-safebrowsing-validator`
 **API:** https://safebrowsing.googleapis.com/v4/threatMatches:find
 **Quota:** 10,000 calls/day
 **Logic:** Batch check URLs (500 at a time)
 
-```typescript
+\`\`\`typescript
 // Threat types: MALWARE, SOCIAL_ENGINEERING, UNWANTED_SOFTWARE
 // Sets: safebrowsing_checked, safebrowsing_score, safebrowsing_verdict
-```
+\`\`\`
 
 #### `virustotal-validator`
 **API:** https://www.virustotal.com/api/v3/
 **Quota:** 500 calls/day (4 req/min)
 **Logic:** Check domain/IP reputation
 
-```typescript
+\`\`\`typescript
 // Rate limit: 15 second delay between requests
 // Sets: virustotal_checked, virustotal_score, virustotal_malicious
-```
+\`\`\`
 
 #### `otx-validator`
 **API:** https://otx.alienvault.com/api/v1/
 **Quota:** Unlimited
 **Logic:** Check pulses, reputation
 
-```typescript
+\`\`\`typescript
 // Sets: otx_checked, otx_score, otx_verdict
 // Stores full data in otx_enrichment table
-```
+\`\`\`
 
 #### `urlscan-validator`
 **API:** https://urlscan.io/api/v1/
 **Quota:** 1000 scans/day
 **Logic:** Submit scan → poll results
 
-```typescript
+\`\`\`typescript
 // 1. Submit scan (POST /scan/)
 // 2. Wait 30 seconds
 // 3. Fetch results (GET /result/{uuid}/)
 // Sets: urlscan_checked, urlscan_score, urlscan_malicious
-```
+\`\`\`
 
 #### `cloudflare-urlscan-validator`
 **API:** Cloudflare URL Scanner
 **Quota:** 1000 scans/day
 **Logic:** Submit scan via Cloudflare API
 
-```typescript
+\`\`\`typescript
 // Sets: cloudflare_urlscan_checked, cloudflare_urlscan_score,
 //       cloudflare_urlscan_malicious, cloudflare_urlscan_categories
-```
+\`\`\`
 
 #### `honeydb-validator`
 **API:** https://honeydb.io/api/
 **Quota:** Unlimited
 **Logic:** Check against honeypot logs
 
-```typescript
+\`\`\`typescript
 // Sets: honeydb_checked, honeydb_in_blacklist, honeydb_threat_score
-```
+\`\`\`
 
 #### `neutrinoapi-validator`
 **API:** https://www.neutrinoapi.com/
 **Quota:** 5000 calls/day
 **Logic:** IP blocklist + host reputation
 
-```typescript
+\`\`\`typescript
 // Sets: neutrinoapi_checked, neutrinoapi_in_blocklist,
 //       neutrinoapi_host_reputation_score, neutrinoapi_is_proxy,
 //       neutrinoapi_is_vpn, neutrinoapi_is_hosting
-```
+\`\`\`
 
 #### `censys-validator`
 **API:** https://search.censys.io/api
 **Quota:** 100 calls/month
 **Logic:** Check certificate transparency logs
 
-```typescript
+\`\`\`typescript
 // Ultra-conservative usage
 // Sets: censys_checked, censys_score, censys_malicious
-```
+\`\`\`
 
 ### Enrichment Functions
 
@@ -624,7 +624,7 @@ interface IngestResult {
 **Purpose:** Consensus-based promotion to `validated_indicators`
 
 **Algorithm:**
-```typescript
+\`\`\`typescript
 function calculateAdvancedScore(indicator, votes) {
   let score = 50; // Base score
   
@@ -662,7 +662,7 @@ function calculateAdvancedScore(indicator, votes) {
 if (score >= 75 || (score >= 65 && indicator.confidence >= 85)) {
   await promoteToValidated(indicator);
 }
-```
+\`\`\`
 
 ### Utility Functions
 
@@ -684,7 +684,7 @@ Monitors ingest source availability
 
 ### Pipeline Stages
 
-```mermaid
+\`\`\`mermaid
 graph LR
     A[Raw Indicators] --> B[Backfill Process]
     B --> C[Dynamic Raw Indicators]
@@ -719,11 +719,11 @@ graph LR
     
     R --> S[Cache Snapshot]
     S --> T[Feed API]
-```
+\`\`\`
 
 ### Cron Schedule
 
-```sql
+\`\`\`sql
 -- Backfill domains (priority)
 */1 * * * *  -- Every 1 minute, 5000 domains/batch
 
@@ -749,7 +749,7 @@ graph LR
 0 2 * * *    -- Daily delta calculation
 0 3 * * *    -- Cache snapshot
 0 4 * * *    -- Cleanup expired cache entries
-```
+\`\`\`
 
 ---
 
@@ -757,7 +757,7 @@ graph LR
 
 ### Database Indexes
 
-```sql
+\`\`\`sql
 -- Critical indexes for feed API
 CREATE INDEX idx_validated_indicators_kind ON validated_indicators(kind);
 CREATE INDEX idx_validated_indicators_confidence ON validated_indicators(confidence DESC);
@@ -769,11 +769,11 @@ CREATE INDEX idx_dynamic_sources_confidence ON dynamic_raw_indicators(source_cou
 
 -- Validator queries
 CREATE INDEX idx_dynamic_validated ON dynamic_raw_indicators(last_validated DESC) WHERE confidence >= 50 AND whitelisted = false;
-```
+\`\`\`
 
 ### Materialized Views
 
-```sql
+\`\`\`sql
 -- Pre-aggregated validator stats
 CREATE MATERIALIZED VIEW validator_stats_mv AS
 SELECT 
@@ -787,7 +787,7 @@ UNION ALL
 
 -- Refresh every 15 minutes via cron
 REFRESH MATERIALIZED VIEW CONCURRENTLY validator_stats_mv;
-```
+\`\`\`
 
 ### Caching Strategy
 
@@ -797,7 +797,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY validator_stats_mv;
 - Serves 99% of feed API requests
 
 **Level 2: Edge Function Memory**
-```typescript
+\`\`\`typescript
 const feedCache = new Map<string, CachedFeed>();
 
 function getCachedFeed(type: string, ttl: number = 300000) {
@@ -807,7 +807,7 @@ function getCachedFeed(type: string, ttl: number = 300000) {
   }
   return null;
 }
-```
+\`\`\`
 
 **Level 3: CDN (Lovable Platform)**
 - `Cache-Control: public, max-age=300` header
@@ -816,19 +816,19 @@ function getCachedFeed(type: string, ttl: number = 300000) {
 ### Query Optimization
 
 **Before (slow):**
-```sql
+\`\`\`sql
 SELECT * FROM validated_indicators 
 WHERE kind = 'ipv4' AND confidence >= 70
 ORDER BY last_validated DESC;
 -- 2.5s query time
-```
+\`\`\`
 
 **After (fast):**
-```sql
+\`\`\`sql
 SELECT * FROM validated_indicators_cache
 WHERE kind = 'ipv4' AND snapshot_hour = EXTRACT(HOUR FROM NOW());
 -- 50ms query time
-```
+\`\`\`
 
 ---
 
@@ -836,7 +836,7 @@ WHERE kind = 'ipv4' AND snapshot_hour = EXTRACT(HOUR FROM NOW());
 
 ### Code Style
 
-```typescript
+\`\`\`typescript
 // Use TypeScript strict mode
 // tsconfig.json
 {
@@ -860,11 +860,11 @@ const useIndicators = (kind: 'ipv4' | 'domain') => {
     queryFn: () => fetchIndicators(kind)
   });
 };
-```
+\`\`\`
 
 ### Testing Strategy
 
-```typescript
+\`\`\`typescript
 // Unit tests (Vitest)
 describe('calculateAdvancedScore', () => {
   it('should return 0 for whitelisted indicators', () => {
@@ -880,28 +880,28 @@ test('feed API returns valid JSON', async ({ page }) => {
   const data = await response.json();
   expect(data).toHaveProperty('indicators');
 });
-```
+\`\`\`
 
 ### Commit Convention
 
-```bash
+\`\`\`bash
 feat: Add Censys validator integration
 fix: Resolve rate limit error in VirusTotal validator
 perf: Optimize feed API query with cache table
 docs: Update API reference for feed endpoints
 refactor: Extract validator logic into shared utility
-```
+\`\`\`
 
 ### Branch Strategy
 
-```
+\`\`\`
 main (protected)
   ├── develop
   │   ├── feature/add-ipv6-support
   │   ├── feature/graphql-api
   │   └── bugfix/fix-cache-invalidation
   └── hotfix/critical-security-patch
-```
+\`\`\`
 
 ---
 

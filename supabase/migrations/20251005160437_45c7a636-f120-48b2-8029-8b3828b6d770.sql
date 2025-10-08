@@ -1,4 +1,3 @@
-
 -- Create priority backfill function that processes domains first
 CREATE OR REPLACE FUNCTION public.priority_backfill_domains(batch_size INTEGER DEFAULT 5000)
 RETURNS TABLE(processed INTEGER, success BOOLEAN, error_msg TEXT)
