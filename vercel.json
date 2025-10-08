@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/fetch-feeds",
+      "schedule": "*/30 * * * * *"
+    },
+    {
+      "path": "/api/cron/deduplicate",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/validate",
+      "schedule": "* * * * *"
+    }
+  ]
+}
