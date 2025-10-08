@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@eslint/js':
-        specifier: latest
-        version: 9.37.0
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.64.0(react@19.0.0))
@@ -122,18 +119,9 @@ importers:
       embla-carousel-react:
         specifier: latest
         version: 8.6.0(react@19.0.0)
-      eslint-plugin-react-hooks:
-        specifier: latest
-        version: 6.1.1(eslint@9.32.0)
-      eslint-plugin-react-refresh:
-        specifier: latest
-        version: 0.4.23(eslint@9.32.0)
       geist:
         specifier: latest
         version: 1.5.1(next@15.2.4(@babel/core@7.28.4)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
-      globals:
-        specifier: latest
-        version: 16.4.0
       input-otp:
         specifier: latest
         version: 1.4.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -176,9 +164,6 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.1.9)
-      typescript-eslint:
-        specifier: latest
-        version: 8.46.0(eslint@9.32.0)(typescript@5.0.2)
       vaul:
         specifier: latest
         version: 1.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -186,6 +171,9 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.37.0
+        version: 9.37.0
       '@tailwindcss/typography':
         specifier: ^0.5.16
         version: 0.5.16(tailwindcss@4.1.9)
@@ -204,6 +192,15 @@ importers:
       eslint-config-next:
         specifier: ^15.5.4
         version: 15.5.4(eslint@9.32.0)(typescript@5.0.2)
+      eslint-plugin-react-hooks:
+        specifier: ^6.1.1
+        version: 6.1.1(eslint@9.32.0)
+      eslint-plugin-react-refresh:
+        specifier: ^0.4.23
+        version: 0.4.23(eslint@9.32.0)
+      globals:
+        specifier: ^16.4.0
+        version: 16.4.0
       postcss:
         specifier: ^8.5
         version: 8.5.0
@@ -213,6 +210,9 @@ importers:
       typescript:
         specifier: ^5
         version: 5.0.2
+      typescript-eslint:
+        specifier: ^8.46.0
+        version: 8.46.0(eslint@9.32.0)(typescript@5.0.2)
 
 packages:
 

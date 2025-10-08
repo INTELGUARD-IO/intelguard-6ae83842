@@ -68,10 +68,10 @@ Il progetto sarà disponibile su `http://localhost:8080`
 
 ### Frontend
 - **Framework**: React 18.3.1 con TypeScript 5.0
-- **Build Tool**: Vite 5.0 (HMR ultra-veloce)
-- **Styling**: TailwindCSS 3.4 + shadcn/ui components
+- **Build Tool**: Next.js 15.5 (App Router)
+- **Styling**: TailwindCSS 4.1 + shadcn/ui components
 - **State Management**: TanStack Query 5.83 (server state)
-- **Routing**: React Router DOM 6.30
+- **Routing**: Next.js App Router (file-based routing)
 - **Charts**: Recharts 2.15 (visualizzazione metriche)
 - **Forms**: React Hook Form 7.61 + Zod validation
 

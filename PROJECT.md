@@ -21,7 +21,7 @@
 graph TB
     subgraph "Frontend Layer"
         UI[React UI + TailwindCSS]
-        Router[React Router]
+        Router[Next.js App Router]
         Query[TanStack Query]
     end
     

@@ -9,7 +9,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@eslint/js": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
@@ -47,10 +46,7 @@
     "cmdk": "latest",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "latest",
-    "eslint-plugin-react-hooks": "latest",
-    "eslint-plugin-react-refresh": "latest",
     "geist": "latest",
-    "globals": "latest",
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
@@ -65,19 +61,23 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "typescript-eslint": "latest",
     "vaul": "latest",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/js": "^9.37.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.32.0",
     "eslint-config-next": "^15.5.4",
+    "eslint-plugin-react-hooks": "^6.1.1",
+    "eslint-plugin-react-refresh": "^0.4.23",
+    "globals": "^16.4.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.46.0"
   }
 }
