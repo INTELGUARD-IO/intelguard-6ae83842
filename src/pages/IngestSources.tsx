@@ -46,6 +46,7 @@ export default function IngestSources() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [runningIngest, setRunningIngest] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadConfig, setUploadConfig] = useState({
     kind: 'ipv4' as 'ipv4' | 'domain',
@@ -307,6 +308,37 @@ export default function IngestSources() {
     }
   };
 
+  async function runAllSources() {
+    if (runningIngest) {
+      toast.info('Ingest already running');
+      return;
+    }
+
+    setRunningIngest(true);
+    try {
+      toast.info('Starting ingest for all enabled sources...');
+      
+      const { data, error } = await supabase.functions.invoke('ingest', {
+        body: { timestamp: new Date().toISOString(), triggered_by: 'manual' }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Ingest completed: ${data?.processed || 0} sources processed`);
+      
+      // Refresh sources and stats
+      await Promise.all([
+        loadSources(),
+        loadRawIndicatorStats(true)
+      ]);
+    } catch (error) {
+      console.error('Ingest error:', error);
+      toast.error('Failed to run ingest');
+    } finally {
+      setRunningIngest(false);
+    }
+  };
+
   if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -347,13 +379,22 @@ export default function IngestSources() {
         </div>
         <div className="flex gap-2">
           {isSuperAdmin && (
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Manual Import
-                </Button>
-              </DialogTrigger>
+            <>
+              <Button 
+                variant="outline" 
+                onClick={runAllSources}
+                disabled={runningIngest}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${runningIngest ? 'animate-spin' : ''}`} />
+                {runningIngest ? 'Running...' : 'Run All Sources'}
+              </Button>
+              <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Manual Import
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Manual Import</DialogTitle>
@@ -409,6 +450,7 @@ export default function IngestSources() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </>
           )}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
