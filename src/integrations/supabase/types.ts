@@ -1702,6 +1702,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      resume_all_validators: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          action: string
+          jobname: string
+          message: string
+        }[]
+      }
       safe_backfill_batch: {
         Args: { batch_size?: number }
         Returns: {
