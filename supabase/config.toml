@@ -1,0 +1,130 @@
+project_id = "qmsidlazqaqwcptpsjqh"
+
+[functions.intelligent-validator]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.whitelist-cross-validator]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.whitelist-email-report]
+verify_jwt = false
+schedule = "0 6 * * *"
+
+[functions.validation-orchestrator]
+verify_jwt = false
+
+[functions.google-safebrowsing-validator]
+verify_jwt = false
+
+[functions.admin-control-log]
+verify_jwt = false
+
+[functions.cloudflare-radar-domains-sync]
+verify_jwt = false
+schedule = "0 3 * * *"
+
+[functions.cisco-umbrella-domains-sync]
+verify_jwt = false
+schedule = "0 2 * * *"
+
+[functions.cloudflare-radar-domain-validator]
+verify_jwt = false
+
+[functions.bgpview-enrich]
+verify_jwt = false
+
+[functions.cloudflare-radar-enrich]
+verify_jwt = false
+
+[functions.abuse-ch-validator]
+verify_jwt = false
+
+[functions.source-health-check]
+verify_jwt = false
+
+[functions.abuseipdb-validator]
+verify_jwt = false
+schedule = "0 4 * * *"
+
+[functions.abuseipdb-enrich]
+verify_jwt = false
+schedule = "0 */6 * * *"
+
+[functions.feed]
+verify_jwt = false
+
+[functions.feed-get]
+verify_jwt = false
+
+[functions.ingest]
+verify_jwt = false
+
+[functions.schedule-validations]
+verify_jwt = false
+
+[functions.run-validations]
+verify_jwt = false
+
+[functions.daily-delta]
+verify_jwt = false
+
+[functions.email-dispatch]
+verify_jwt = false
+
+[functions.manual-ingest]
+verify_jwt = false
+
+[functions.urlscan-validator]
+verify_jwt = false
+schedule = "0 */4 * * *"
+
+[functions.honeydb-validator]
+verify_jwt = false
+schedule = "0 */12 * * *"
+
+[functions.neutrinoapi-validator]
+verify_jwt = false
+schedule = "0 */6 * * *"
+
+[functions.virustotal-validator]
+verify_jwt = false
+
+[functions.censys-validator]
+verify_jwt = false
+
+[functions.ripestat-enrich]
+verify_jwt = false
+
+[functions.otx-validator]
+verify_jwt = false
+schedule = "0 */4 * * *"
+
+[functions.cloudflare-urlscan-validator]
+verify_jwt = false
+schedule = "0 */8 * * *"
+
+[functions.enrich-validated-indicators]
+verify_jwt = false
+schedule = "0 2 * * *"
+
+[functions.domain-resolver-validator]
+verify_jwt = false
+schedule = "0 */6 * * *"
+
+[functions.trigger-domain-validation]
+verify_jwt = false
+
+[functions.snapshot-cache]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.backfill-indicators]
+verify_jwt = false
+
+[functions.auto-start-domain-validation]
+verify_jwt = false
+
+[functions.feed-warmup]
+verify_jwt = false
