@@ -149,13 +149,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // === VALIDATOR 2: Google Safe Browsing (high priority for domains, weight doppio) ===
+      // === VALIDATOR 2: Google Safe Browsing ===
       if (indicator.safebrowsing_checked) {
         if (indicator.safebrowsing_verdict && indicator.safebrowsing_verdict !== 'clean') {
-          const weight = indicator.kind === 'domain' ? 2 : 1;
-          for (let i = 0; i < weight; i++) {
-            votes.push({ name: 'SafeBrowsing', vote: 'malicious', reason: `Verdict: ${indicator.safebrowsing_verdict}` });
-          }
+          votes.push({ name: 'SafeBrowsing', vote: 'malicious', reason: `Verdict: ${indicator.safebrowsing_verdict}` });
         } else {
           votes.push({ name: 'SafeBrowsing', vote: 'clean' });
         }
@@ -254,30 +251,58 @@ Deno.serve(async (req) => {
         }
       }
 
-      // === VALIDATOR 10: Cloudflare URL Scanner (for domains, weight doppio) ===
+      // === VALIDATOR 10: Cloudflare URL Scanner ===
       if (indicator.cloudflare_urlscan_checked && indicator.kind === 'domain') {
         if (indicator.cloudflare_urlscan_malicious || (indicator.cloudflare_urlscan_score !== null && indicator.cloudflare_urlscan_score >= 70)) {
-          const weight = 2; // Weight doppio per domini
-          for (let i = 0; i < weight; i++) {
-            votes.push({ 
-              name: 'Cloudflare URLScan', 
-              vote: 'malicious',
-              score: indicator.cloudflare_urlscan_score,
-              reason: indicator.cloudflare_urlscan_categories?.join(', ') || 'Malicious'
-            });
-          }
+          votes.push({ 
+            name: 'Cloudflare URLScan', 
+            vote: 'malicious',
+            score: indicator.cloudflare_urlscan_score,
+            reason: indicator.cloudflare_urlscan_categories?.join(', ') || 'Malicious'
+          });
         } else {
           votes.push({ name: 'Cloudflare URLScan', vote: 'clean' });
         }
       }
 
+      // === CRITICAL: For domains, REQUIRE both SafeBrowsing AND Cloudflare URLScan ===
+      if (indicator.kind === 'domain') {
+        const hasSafeBrowsing = indicator.safebrowsing_checked;
+        const hasCloudflare = indicator.cloudflare_urlscan_checked;
+        
+        if (!hasSafeBrowsing || !hasCloudflare) {
+          // Skip validation - domain needs BOTH validators
+          console.log(`[intelligent-validator] ⏭️ SKIPPED: ${indicator.indicator} - Missing validators (SafeBrowsing: ${hasSafeBrowsing}, Cloudflare: ${hasCloudflare})`);
+          
+          // Trigger validation if missing
+          if (!hasCloudflare) {
+            console.log(`[intelligent-validator] 🚀 Triggering Cloudflare URLScan for: ${indicator.indicator}`);
+            await supabase.functions.invoke('cloudflare-urlscan-validator', {
+              body: { domains: [indicator.indicator] }
+            }).catch(err => console.error(`Failed to trigger Cloudflare validator: ${err.message}`));
+          }
+          
+          skipped++;
+          continue;
+        }
+        
+        // Check for DISAGREEMENT between SafeBrowsing and Cloudflare
+        const safeBrowsingMalicious = indicator.safebrowsing_verdict && indicator.safebrowsing_verdict !== 'clean';
+        const cloudflareMalicious = indicator.cloudflare_urlscan_malicious || (indicator.cloudflare_urlscan_score !== null && indicator.cloudflare_urlscan_score >= 70);
+        
+        if (safeBrowsingMalicious !== cloudflareMalicious) {
+          console.log(`[intelligent-validator] ⚠️ DISAGREEMENT: ${indicator.indicator} - SafeBrowsing: ${safeBrowsingMalicious ? 'malicious' : 'clean'}, Cloudflare: ${cloudflareMalicious ? 'malicious' : 'clean'}`);
+          // Continue to voting logic to decide
+        }
+      }
+      
       // === ADVANCED SCORING SYSTEM ===
       const advancedScore = calculateAdvancedScore({ ...indicator, is_trusted: isTrusted }, votes);
       
       // Calculate basic consensus
       const maliciousVotes = votes.filter(v => v.vote === 'malicious').length;
       const totalVotes = votes.length;
-      const consensusThreshold = indicator.kind === 'domain' ? 1 : 2; // 1 per domini, 2 per IP
+      const consensusThreshold = indicator.kind === 'domain' ? 2 : 2; // CRITICAL: 2 validators required for domains (SafeBrowsing + Cloudflare)
 
       // ✨ SPECIAL LOGIC: Trust abuse.ch sources directly for domains
       const isFromAbuseCh = indicator.sources?.some((s: string) => 
