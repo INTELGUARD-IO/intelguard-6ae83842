@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface DomainToScan {
+interface IndicatorToScan {
   id: number;
   indicator: string;
   kind: string;
@@ -72,15 +72,15 @@ Deno.serve(async (req) => {
       console.error('Cleanup error:', cleanupError);
     }
 
-    // Step 2: Fetch domains to scan
+    // Step 2: Fetch indicators to scan (domains and IPv4)
     const BATCH_SIZE = 1000; // Aggressive batch size for maximum coverage
     const MAX_RETRIES = 1; // Quick retry strategy
-    console.log(`📊 Fetching up to ${BATCH_SIZE} domains to scan...`);
+    console.log(`📊 Fetching up to ${BATCH_SIZE} indicators to scan...`);
 
-    const { data: domains, error: fetchError } = await supabase
+    const { data: indicators, error: fetchError } = await supabase
       .from('dynamic_raw_indicators')
       .select('id, indicator, kind, confidence')
-      .eq('kind', 'domain')
+      .in('kind', ['domain', 'ipv4'])
       .gte('confidence', 50)
       .eq('whitelisted', false)
       .eq('cloudflare_urlscan_checked', false)
@@ -92,36 +92,36 @@ Deno.serve(async (req) => {
       throw fetchError;
     }
 
-    if (!domains || domains.length === 0) {
-      console.log('✅ No domains to scan');
+    if (!indicators || indicators.length === 0) {
+      console.log('✅ No indicators to scan');
       return new Response(
-        JSON.stringify({ message: 'No domains to scan', processed: 0 }),
+        JSON.stringify({ message: 'No indicators to scan', processed: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`🔍 Found ${domains.length} domains to scan`);
+    console.log(`🔍 Found ${indicators.length} indicators to scan (${indicators.filter(i => i.kind === 'domain').length} domains, ${indicators.filter(i => i.kind === 'ipv4').length} IPs)`);
 
     let scanned = 0;
     let cached = 0;
     let failed = 0;
 
-    // Step 3: Process each domain
-    for (const domain of domains) {
+    // Step 3: Process each indicator
+    for (const indicator of indicators) {
       try {
-        console.log(`\n🔄 Processing ${domain.indicator}...`);
+        console.log(`\n🔄 Processing ${indicator.kind}: ${indicator.indicator}...`);
 
         // Check cache first
         const { data: cacheEntry } = await supabase
           .from('cloudflare_urlscan_cache')
           .select('*')
-          .eq('indicator', domain.indicator)
-          .eq('kind', 'domain')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
           .gt('expires_at', new Date().toISOString())
           .single();
 
         if (cacheEntry) {
-          console.log(`✓ Using cached result for ${domain.indicator}`);
+          console.log(`✓ Using cached result for ${indicator.indicator}`);
           
           // Update dynamic_raw_indicators from cache
           await supabase
@@ -133,11 +133,16 @@ Deno.serve(async (req) => {
               cloudflare_urlscan_categories: cacheEntry.categories,
               cloudflare_urlscan_verdict: cacheEntry.verdict,
             })
-            .eq('id', domain.id);
+            .eq('id', indicator.id);
 
           cached++;
           continue;
         }
+        
+        // Prepare scan URL based on indicator type
+        const scanTargetUrl = indicator.kind === 'ipv4' 
+          ? `http://${indicator.indicator}` 
+          : `https://${indicator.indicator}`;
 
         // Submit scan with retry logic
         const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan`;
@@ -148,7 +153,7 @@ Deno.serve(async (req) => {
         
         while (retryCount <= MAX_RETRIES) {
           try {
-            console.log(`📤 Submitting scan for ${domain.indicator} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+            console.log(`📤 Submitting scan for ${indicator.indicator} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
             scanResponse = await fetch(scanUrl, {
               method: 'POST',
               headers: {
@@ -156,7 +161,7 @@ Deno.serve(async (req) => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                url: `https://${domain.indicator}`,
+                url: scanTargetUrl,
                 visibility: 'unlisted',
                 customHeaders: {},
               }),
@@ -190,7 +195,7 @@ Deno.serve(async (req) => {
 
         // If all retries failed
         if (!scanData) {
-          console.error(`❌ All retry attempts failed for ${domain.indicator}`);
+          console.error(`❌ All retry attempts failed for ${indicator.indicator}`);
           failed++;
           
           await supabase
@@ -199,13 +204,13 @@ Deno.serve(async (req) => {
               cloudflare_urlscan_checked: true,
               cloudflare_urlscan_verdict: 'error',
             })
-            .eq('id', domain.id);
+            .eq('id', indicator.id);
           
           continue;
         }
 
         const scanUuid = scanData.result.uuid;
-        console.log(`✓ Scan submitted for ${domain.indicator}, UUID: ${scanUuid}`);
+        console.log(`✓ Scan submitted for ${indicator.indicator}, UUID: ${scanUuid}`);
 
         // Wait and poll for results (max 24s)
         const maxAttempts = 8; // 8 attempts * 3s = 24s
@@ -226,17 +231,17 @@ Deno.serve(async (req) => {
             
             if (resultData.result.task?.success) {
               result = resultData.result;
-              console.log(`✓ Scan completed for ${domain.indicator}`);
+              console.log(`✓ Scan completed for ${indicator.indicator}`);
               break;
             } else if (resultData.result.status === 'failed') {
-              console.error(`Scan failed for ${domain.indicator}`);
+              console.error(`Scan failed for ${indicator.indicator}`);
               break;
             }
           }
         }
 
         if (!result || !result.task?.success) {
-          console.error(`⏱️ Scan timeout or failed for ${domain.indicator}`);
+          console.error(`⏱️ Scan timeout or failed for ${indicator.indicator}`);
           failed++;
           
           await supabase
@@ -245,7 +250,7 @@ Deno.serve(async (req) => {
               cloudflare_urlscan_checked: true,
               cloudflare_urlscan_verdict: 'timeout',
             })
-            .eq('id', domain.id);
+            .eq('id', indicator.id);
           
           continue;
         }
@@ -264,14 +269,14 @@ Deno.serve(async (req) => {
           if (categories.includes('Malware')) score = Math.min(100, score + 15);
         }
 
-        console.log(`✓ Analysis complete for ${domain.indicator}: ${verdict} (score: ${score})`);
+        console.log(`✓ Analysis complete for ${indicator.indicator}: ${verdict} (score: ${score})`);
 
         // Upsert cache
         await supabase
           .from('cloudflare_urlscan_cache')
           .upsert({
-            indicator: domain.indicator,
-            kind: 'domain',
+            indicator: indicator.indicator,
+            kind: indicator.kind,
             scan_id: result.uuid,
             verdict,
             score,
@@ -286,8 +291,8 @@ Deno.serve(async (req) => {
 
         // Use stored procedure to merge sources atomically
         await supabase.rpc('merge_validator_result', {
-          p_indicator: domain.indicator,
-          p_kind: 'domain',
+          p_indicator: indicator.indicator,
+          p_kind: indicator.kind,
           p_new_source: 'cloudflare_urlscan',
           p_confidence: 60, // Default confidence for cloudflare urlscan
           p_validator_fields: {
@@ -305,7 +310,7 @@ Deno.serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error) {
-        console.error(`Error processing ${domain.indicator}:`, error);
+        console.error(`Error processing ${indicator.indicator}:`, error);
         failed++;
         
         // Mark as checked to avoid reprocessing
@@ -315,7 +320,7 @@ Deno.serve(async (req) => {
             cloudflare_urlscan_checked: true,
             cloudflare_urlscan_verdict: 'error',
           })
-          .eq('id', domain.id);
+          .eq('id', indicator.id);
       }
     }
 
