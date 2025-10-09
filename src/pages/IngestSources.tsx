@@ -324,7 +324,14 @@ export default function IngestSources() {
 
       if (error) throw error;
 
-      toast.success(`Ingest completed: ${data?.processed || 0} sources processed`);
+      const sourcesProcessed = data?.sources_processed || 0;
+      const indicatorsCount = data?.count || 0;
+      const remaining = data?.sources_remaining || 0;
+      
+      toast.success(
+        `Ingest completed: ${sourcesProcessed} sources processed, ${indicatorsCount.toLocaleString()} indicators collected` +
+        (remaining > 0 ? ` (${remaining} sources remaining)` : '')
+      );
       
       // Refresh sources and stats
       await Promise.all([
