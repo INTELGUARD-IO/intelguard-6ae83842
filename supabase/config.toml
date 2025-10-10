@@ -1,5 +1,8 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.ipsum-level7-sync]
+verify_jwt = false
+
 [functions.drb-ra-c2intel-sync]
 verify_jwt = false
 
