@@ -60,18 +60,31 @@ Deno.serve(async (req) => {
     console.log('[bgpview-enrich] Cleaning expired cache...');
     await supabase.rpc('clean_expired_bgpview_cache');
     
-    // Step 2: Fetch IPv4 indicators with confidence >= 50
+    // Step 2: Fetch IPv4 indicators to enrich (prioritize validated_indicators)
     console.log('[bgpview-enrich] Fetching indicators to enrich...');
-    const { data: indicators, error: fetchError } = await supabase
-      .from('dynamic_raw_indicators')
-      .select('indicator, kind, confidence')
+    
+    // First, fetch validated_indicators missing country/ASN
+    const { data: validatedIndicators } = await supabase
+      .from('validated_indicators')
+      .select('indicator, kind')
       .eq('kind', 'ipv4')
-      .gte('confidence', 50)
-      .order('confidence', { ascending: false })
+      .or('country.is.null,asn.is.null')
       .limit(BATCH_SIZE);
     
-    if (fetchError) {
-      throw new Error(`Failed to fetch indicators: ${fetchError.message}`);
+    let indicators = validatedIndicators || [];
+    
+    // If we have less than BATCH_SIZE, supplement with high-confidence raw indicators
+    if (indicators.length < BATCH_SIZE) {
+      const remaining = BATCH_SIZE - indicators.length;
+      const { data: dynamicIndicators } = await supabase
+        .from('dynamic_raw_indicators')
+        .select('indicator, kind, confidence')
+        .eq('kind', 'ipv4')
+        .gte('confidence', 50)
+        .order('confidence', { ascending: false })
+        .limit(remaining);
+      
+      indicators = [...indicators, ...(dynamicIndicators || [])];
     }
     
     if (!indicators || indicators.length === 0) {

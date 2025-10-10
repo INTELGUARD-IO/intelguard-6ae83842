@@ -1455,6 +1455,17 @@ export type Database = {
         }
         Relationships: []
       }
+      enrichment_summary: {
+        Row: {
+          asn: string | null
+          asn_name: string | null
+          country: string | null
+          indicator: string | null
+          kind: string | null
+          last_enriched: string | null
+        }
+        Relationships: []
+      }
       raw_indicator_stats_mv: {
         Row: {
           domain_count: number | null

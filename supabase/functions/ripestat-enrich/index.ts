@@ -59,19 +59,31 @@ Deno.serve(async (req) => {
       console.log('✓ Expired cache cleaned');
     }
 
-    // Step 2: Fetch indicators that need enrichment (IPv4 only for now)
+    // Step 2: Fetch indicators to enrich (prioritize validated_indicators)
     console.log('Step 2: Fetching indicators to enrich...');
     
-    const { data: indicators, error: fetchError } = await supabase
-      .from('dynamic_raw_indicators')
-      .select('indicator, kind, confidence')
+    // First, fetch validated_indicators missing country/ASN
+    const { data: validatedIndicators } = await supabase
+      .from('validated_indicators')
+      .select('indicator, kind')
       .eq('kind', 'ipv4')
-      .gte('confidence', 50) // Only enrich high-confidence indicators
-      .order('confidence', { ascending: false })
-      .limit(100); // Process in batches
-
-    if (fetchError) {
-      throw new Error(`Error fetching indicators: ${fetchError.message}`);
+      .or('country.is.null,asn.is.null')
+      .limit(100);
+    
+    let indicators = validatedIndicators || [];
+    
+    // If we have less than 100, supplement with high-confidence raw indicators
+    if (indicators.length < 100) {
+      const remaining = 100 - indicators.length;
+      const { data: dynamicIndicators } = await supabase
+        .from('dynamic_raw_indicators')
+        .select('indicator, kind, confidence')
+        .eq('kind', 'ipv4')
+        .gte('confidence', 50)
+        .order('confidence', { ascending: false })
+        .limit(remaining);
+      
+      indicators = [...indicators, ...(dynamicIndicators || [])];
     }
 
     if (!indicators || indicators.length === 0) {
