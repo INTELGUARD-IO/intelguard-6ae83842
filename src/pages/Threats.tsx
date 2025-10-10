@@ -191,12 +191,9 @@ export default function Threats() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Threat Intelligence Feed</h1>
+          <h1 className="text-3xl font-bold">Top1K Threat Intelligence Feed</h1>
           <p className="text-muted-foreground mt-1">
-            High-confidence threat indicators from multiple intelligence sources
-          </p>
-          <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
-            <strong>Validated Indicators:</strong> These are raw indicators that successfully passed comprehensive validation through multiple security validators (VirusTotal, AbuseIPDB, URLScan, etc.). Only ~1-2% of raw indicators achieve the required confidence threshold (≥70%), validator consensus, and sufficient malicious scores to be promoted here. This strict filtering ensures high-quality, actionable threat intelligence.
+            High-confidence threat indicators ready for immediate use
           </p>
         </div>
         <Button onClick={exportCSV} variant="outline" size="sm">
