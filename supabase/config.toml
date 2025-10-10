@@ -1,5 +1,8 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.drb-ra-c2intel-sync]
+verify_jwt = false
+
 [functions.intelligent-validator]
 verify_jwt = false
 schedule = "0 * * * *"
