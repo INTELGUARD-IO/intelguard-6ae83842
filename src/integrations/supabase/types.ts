@@ -807,6 +807,87 @@ export type Database = {
         }
         Relationships: []
       }
+      ip_api_enrichment: {
+        Row: {
+          as_name: string | null
+          as_number: number | null
+          checked_at: string
+          city: string | null
+          continent: string | null
+          continent_code: string | null
+          country: string | null
+          country_code: string | null
+          district: string | null
+          expires_at: string
+          indicator: string
+          is_hosting: boolean | null
+          is_mobile: boolean | null
+          is_proxy: boolean | null
+          isp: string | null
+          kind: string
+          lat: number | null
+          lon: number | null
+          org: string | null
+          raw_response: Json | null
+          region: string | null
+          region_name: string | null
+          timezone: string | null
+          zip: string | null
+        }
+        Insert: {
+          as_name?: string | null
+          as_number?: number | null
+          checked_at?: string
+          city?: string | null
+          continent?: string | null
+          continent_code?: string | null
+          country?: string | null
+          country_code?: string | null
+          district?: string | null
+          expires_at?: string
+          indicator: string
+          is_hosting?: boolean | null
+          is_mobile?: boolean | null
+          is_proxy?: boolean | null
+          isp?: string | null
+          kind?: string
+          lat?: number | null
+          lon?: number | null
+          org?: string | null
+          raw_response?: Json | null
+          region?: string | null
+          region_name?: string | null
+          timezone?: string | null
+          zip?: string | null
+        }
+        Update: {
+          as_name?: string | null
+          as_number?: number | null
+          checked_at?: string
+          city?: string | null
+          continent?: string | null
+          continent_code?: string | null
+          country?: string | null
+          country_code?: string | null
+          district?: string | null
+          expires_at?: string
+          indicator?: string
+          is_hosting?: boolean | null
+          is_mobile?: boolean | null
+          is_proxy?: boolean | null
+          isp?: string | null
+          kind?: string
+          lat?: number | null
+          lon?: number | null
+          org?: string | null
+          raw_response?: Json | null
+          region?: string | null
+          region_name?: string | null
+          timezone?: string | null
+          zip?: string | null
+        }
+        Relationships: []
+      }
       ipqs_monthly_usage: {
         Row: {
           api_calls_count: number
@@ -1655,6 +1736,10 @@ export type Database = {
         Returns: undefined
       }
       clean_expired_honeydb_blacklist: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      clean_expired_ip_api_cache: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

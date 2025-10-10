@@ -1,5 +1,8 @@
 project_id = "qmsidlazqaqwcptpsjqh"
 
+[functions.ip-api-enrich]
+verify_jwt = false
+
 [functions.ipsum-level7-sync]
 verify_jwt = false
 
