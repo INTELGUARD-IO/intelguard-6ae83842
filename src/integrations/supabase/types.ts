@@ -1446,11 +1446,19 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_stats_mv: {
+        Row: {
+          asn_count: number | null
+          countries_count: number | null
+          kind: string | null
+          validated_count: number | null
+        }
+        Relationships: []
+      }
       raw_indicator_stats_mv: {
         Row: {
           domain_count: number | null
           ipv4_count: number | null
-          last_updated: string | null
           total_count: number | null
           unique_domain_count: number | null
           unique_ipv4_count: number | null
