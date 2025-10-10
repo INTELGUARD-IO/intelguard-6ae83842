@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.montysecurity-c2-tracker-sync]
 verify_jwt = false
+
+[functions.ipqualityscore-validator]
+verify_jwt = false

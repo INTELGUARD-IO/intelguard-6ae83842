@@ -386,6 +386,12 @@ export type Database = {
           honeydb_threat_score: number | null
           id: number
           indicator: string
+          ipqs_category: string | null
+          ipqs_checked: boolean
+          ipqs_malicious: boolean | null
+          ipqs_metadata: Json | null
+          ipqs_risk_score: number | null
+          ipqs_score: number | null
           kind: string
           last_validated: string
           neutrinoapi_checked: boolean
@@ -433,6 +439,12 @@ export type Database = {
           honeydb_threat_score?: number | null
           id?: number
           indicator: string
+          ipqs_category?: string | null
+          ipqs_checked?: boolean
+          ipqs_malicious?: boolean | null
+          ipqs_metadata?: Json | null
+          ipqs_risk_score?: number | null
+          ipqs_score?: number | null
           kind: string
           last_validated?: string
           neutrinoapi_checked?: boolean
@@ -480,6 +492,12 @@ export type Database = {
           honeydb_threat_score?: number | null
           id?: number
           indicator?: string
+          ipqs_category?: string | null
+          ipqs_checked?: boolean
+          ipqs_malicious?: boolean | null
+          ipqs_metadata?: Json | null
+          ipqs_risk_score?: number | null
+          ipqs_score?: number | null
           kind?: string
           last_validated?: string
           neutrinoapi_checked?: boolean
@@ -786,6 +804,78 @@ export type Database = {
           priority?: number | null
           updated_at?: string
           url?: string
+        }
+        Relationships: []
+      }
+      ipqs_monthly_usage: {
+        Row: {
+          api_calls_count: number
+          created_at: string
+          id: string
+          month: string
+          monthly_limit: number
+          updated_at: string
+        }
+        Insert: {
+          api_calls_count?: number
+          created_at?: string
+          id?: string
+          month: string
+          monthly_limit?: number
+          updated_at?: string
+        }
+        Update: {
+          api_calls_count?: number
+          created_at?: string
+          id?: string
+          month?: string
+          monthly_limit?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ipqualityscore_cache: {
+        Row: {
+          adult: boolean | null
+          category: string | null
+          checked_at: string
+          expires_at: string
+          indicator: string
+          kind: string
+          malware: boolean | null
+          phishing: boolean | null
+          raw_response: Json | null
+          risk_score: number | null
+          spamming: boolean | null
+          suspicious: boolean | null
+        }
+        Insert: {
+          adult?: boolean | null
+          category?: string | null
+          checked_at?: string
+          expires_at?: string
+          indicator: string
+          kind: string
+          malware?: boolean | null
+          phishing?: boolean | null
+          raw_response?: Json | null
+          risk_score?: number | null
+          spamming?: boolean | null
+          suspicious?: boolean | null
+        }
+        Update: {
+          adult?: boolean | null
+          category?: string | null
+          checked_at?: string
+          expires_at?: string
+          indicator?: string
+          kind?: string
+          malware?: boolean | null
+          phishing?: boolean | null
+          raw_response?: Json | null
+          risk_score?: number | null
+          spamming?: boolean | null
+          suspicious?: boolean | null
         }
         Relationships: []
       }
@@ -1632,6 +1722,16 @@ export type Database = {
           remaining_calls: number
         }[]
       }
+      get_current_month_ipqs_quota: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          api_calls_count: number
+          id: string
+          month: string
+          monthly_limit: number
+          remaining_calls: number
+        }[]
+      }
       get_dashboard_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1676,6 +1776,10 @@ export type Database = {
         Returns: undefined
       }
       increment_censys_usage: {
+        Args: { calls_count?: number }
+        Returns: undefined
+      }
+      increment_ipqs_usage: {
         Args: { calls_count?: number }
         Returns: undefined
       }

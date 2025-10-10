@@ -14,6 +14,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { AbuseIPDBQuotaWidget } from "@/components/AbuseIPDBQuotaWidget";
 import { ValidatorConsensusWidget } from "@/components/ValidatorConsensusWidget";
 import { AllQuotasWidget } from "@/components/AllQuotasWidget";
+import { IPQSQuotaWidget } from "@/components/IPQSQuotaWidget";
 
 interface MetricData {
   label: string;
@@ -944,9 +945,10 @@ const Monitoring = () => {
       </div>
 
       {/* Quota Monitoring Widgets */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <ValidatorConsensusWidget />
         <AbuseIPDBQuotaWidget />
+        <IPQSQuotaWidget />
       </div>
 
       {/* All Quotas Monitor */}

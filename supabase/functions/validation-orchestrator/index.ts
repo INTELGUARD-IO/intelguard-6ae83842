@@ -19,6 +19,8 @@ const LOW_PRIORITY_VALIDATORS = ['abuseipdb', 'honeydb', 'censys', 'urlscan'];
 
 // Validator weights for score aggregation
 const VALIDATOR_WEIGHTS: Record<string, number> = {
+  // Premium validators
+  ipqualityscore: 2.0,
   // High priority (generous API limits)
   neutrinoapi: 1.0,
   safebrowsing: 1.2,
@@ -34,7 +36,7 @@ const VALIDATOR_WEIGHTS: Record<string, number> = {
 
 // Validators by indicator type (edge function names)
 const IP_VALIDATORS = ['neutrinoapi-validator', 'google-safebrowsing-validator', 'otx-validator', 'virustotal-validator', 'honeydb-validator', 'abuseipdb-validator', 'censys-validator'];
-const DOMAIN_VALIDATORS = ['google-safebrowsing-validator', 'otx-validator', 'virustotal-validator', 'urlscan-validator', 'abuse-ch-validator'];
+const DOMAIN_VALIDATORS = ['ipqualityscore-validator', 'google-safebrowsing-validator', 'otx-validator', 'virustotal-validator', 'urlscan-validator', 'abuse-ch-validator'];
 
 interface IndicatorToValidate {
   id: number;
@@ -378,6 +380,22 @@ async function fetchValidatorResult(
           score = 0;
           malicious = false;
           metadata = data;
+        }
+        break;
+      }
+
+      case 'ipqualityscore-validator': {
+        const { data } = await supabase
+          .from('dynamic_raw_indicators')
+          .select('ipqs_checked, ipqs_score, ipqs_malicious, ipqs_metadata')
+          .eq('indicator', indicator.indicator)
+          .eq('kind', indicator.kind)
+          .maybeSingle();
+        
+        if (data?.ipqs_checked) {
+          score = data.ipqs_score || 0;
+          malicious = data.ipqs_malicious || false;
+          metadata = data.ipqs_metadata;
         }
         break;
       }
