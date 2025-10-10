@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.feed-warmup]
 verify_jwt = false
+
+[functions.montysecurity-c2-tracker-sync]
+verify_jwt = false
