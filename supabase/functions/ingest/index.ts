@@ -21,8 +21,8 @@ interface IngestSource {
   last_attempt: string | null;
 }
 
-// Process max 17 sources per invocation (processes all 34 sources in 2 hours with hourly cron)
-const MAX_SOURCES_PER_RUN = 17;
+// Process max 25 sources per invocation (processes all 33 active sources in ~1.5 hours with hourly cron)
+const MAX_SOURCES_PER_RUN = 25;
 
 // --- Helpers di validazione ---
 const isIPv4 = (s: string) =>
