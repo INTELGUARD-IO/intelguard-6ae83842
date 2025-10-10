@@ -201,8 +201,13 @@ Deno.serve(async (req) => {
                 break; // Success!
               }
               
-              const errorText = await scanResponse.text();
-              console.error(`  ⚠️  Scan submission failed (attempt ${retryCount + 1}):`, errorText);
+              // DETAILED ERROR LOGGING
+              const errorBody = await scanResponse.text();
+              console.error(`  ❌ Scan submission FAILED (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+              console.error(`     Status: ${scanResponse.status} ${scanResponse.statusText}`);
+              console.error(`     URL: ${scanUrl}`);
+              console.error(`     Response Body: ${errorBody}`);
+              console.error(`     Response Headers:`, Object.fromEntries(scanResponse.headers.entries()));
               
               // Check for rate limiting
               if (scanResponse.status === 429) {
