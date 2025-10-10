@@ -136,6 +136,13 @@ Deno.serve(async (req) => {
         }
       }
 
+      // CHECK 2: Double-check whitelisted status (potrebbe essere cambiato dopo query iniziale)
+      if (indicator.whitelisted === true) {
+        console.log(`[intelligent-validator] 🛡️ WHITELISTED: ${indicator.indicator} (marked by whitelist-cross-validator)`);
+        skipped++;
+        continue;
+      }
+
       const votes: ValidatorVote[] = [];
 
       // === VALIDATOR 1: OTX (AlienVault) ===
