@@ -284,11 +284,16 @@ export default function Dashboard() {
 
       {/* Raw Indicators Pipeline Section */}
       <div className="space-y-4">
-        <SectionHeader 
-          title="Raw Indicators Pipeline" 
-          badge="Unprocessed Data" 
-          icon={Database}
-        />
+        <div>
+          <SectionHeader 
+            title="Raw Indicators Pipeline" 
+            badge="Unprocessed Data" 
+            icon={Database}
+          />
+          <p className="text-sm text-muted-foreground mt-1">
+            Active indicators after deduplication and removal processing
+          </p>
+        </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
