@@ -6,22 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Download, AlertTriangle, Shield } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 interface ThreatIndicator {
   indicator: string;
   kind: string;
@@ -35,7 +21,6 @@ interface ThreatIndicator {
   sources_count: number;
   severity: 'critical' | 'high' | 'medium' | 'low';
 }
-
 interface ThreatStats {
   total: number;
   critical: number;
@@ -44,7 +29,6 @@ interface ThreatStats {
   ipv4: number;
   domains: number;
 }
-
 export default function Threats() {
   const [threats, setThreats] = useState<ThreatIndicator[]>([]);
   const [stats, setStats] = useState<ThreatStats>({
@@ -53,48 +37,39 @@ export default function Threats() {
     high: 0,
     medium: 0,
     ipv4: 0,
-    domains: 0,
+    domains: 0
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'ipv4' | 'domain'>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [threatTypeFilter, setThreatTypeFilter] = useState<string>('all');
-
   useEffect(() => {
     loadThreats();
   }, [activeTab, severityFilter, threatTypeFilter]);
-
   const loadThreats = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('validated_indicators')
-        .select('*')
-        .order('last_validated', { ascending: false })
-        .limit(1000);
-
+      let query = supabase.from('validated_indicators').select('*').order('last_validated', {
+        ascending: false
+      }).limit(1000);
       if (activeTab !== 'all') {
         query = query.eq('kind', activeTab);
       }
-
       if (threatTypeFilter !== 'all') {
         query = query.eq('threat_type', threatTypeFilter);
       }
-
-      const { data, error } = await query;
-
+      const {
+        data,
+        error
+      } = await query;
       if (error) throw error;
-      
+
       // Map and enrich data
       const threatData: ThreatIndicator[] = (data || []).map((item: any) => {
         // Calculate severity based on confidence
         let severity: 'critical' | 'high' | 'medium' | 'low';
-        if (item.confidence >= 90) severity = 'critical';
-        else if (item.confidence >= 80) severity = 'high';
-        else if (item.confidence >= 70) severity = 'medium';
-        else severity = 'low';
-
+        if (item.confidence >= 90) severity = 'critical';else if (item.confidence >= 80) severity = 'high';else if (item.confidence >= 70) severity = 'medium';else severity = 'low';
         return {
           indicator: item.indicator,
           kind: item.kind,
@@ -111,10 +86,7 @@ export default function Threats() {
       });
 
       // Apply severity filter if needed
-      const filteredData = severityFilter !== 'all' 
-        ? threatData.filter(t => t.severity === severityFilter)
-        : threatData;
-
+      const filteredData = severityFilter !== 'all' ? threatData.filter(t => t.severity === severityFilter) : threatData;
       setThreats(filteredData);
 
       // Calculate stats
@@ -124,7 +96,7 @@ export default function Threats() {
         high: filteredData.filter(t => t.severity === 'high').length,
         medium: filteredData.filter(t => t.severity === 'medium').length,
         ipv4: filteredData.filter(t => t.kind === 'ipv4').length,
-        domains: filteredData.filter(t => t.kind === 'domain').length,
+        domains: filteredData.filter(t => t.kind === 'domain').length
       });
     } catch (error) {
       console.error('Error loading threats:', error);
@@ -132,69 +104,53 @@ export default function Threats() {
       setLoading(false);
     }
   };
-
-  const filteredThreats = threats.filter(threat =>
-    threat.indicator.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    threat.country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    threat.asn?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  const filteredThreats = threats.filter(threat => threat.indicator.toLowerCase().includes(searchTerm.toLowerCase()) || threat.country?.toLowerCase().includes(searchTerm.toLowerCase()) || threat.asn?.toLowerCase().includes(searchTerm.toLowerCase()));
   const exportCSV = () => {
-    const csv = [
-      ['Indicator', 'Type', 'Threat Category', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','),
-      ...filteredThreats.map(t =>
-        [
-          t.indicator,
-          t.kind,
-          t.threat_type || 'unknown',
-          t.severity,
-          t.country || '',
-          t.asn || '',
-          t.asn_name || '',
-          t.sources_count,
-          new Date(t.first_seen).toISOString(),
-          new Date(t.last_seen).toISOString(),
-        ].join(',')
-      ),
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = [['Indicator', 'Type', 'Threat Category', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','), ...filteredThreats.map(t => [t.indicator, t.kind, t.threat_type || 'unknown', t.severity, t.country || '', t.asn || '', t.asn_name || '', t.sources_count, new Date(t.first_seen).toISOString(), new Date(t.last_seen).toISOString()].join(','))].join('\n');
+    const blob = new Blob([csv], {
+      type: 'text/csv'
+    });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `threat-feed-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
-
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'destructive';
-      case 'high': return 'default';
-      case 'medium': return 'secondary';
-      default: return 'outline';
+      case 'critical':
+        return 'destructive';
+      case 'high':
+        return 'default';
+      case 'medium':
+        return 'secondary';
+      default:
+        return 'outline';
     }
   };
-
   const getThreatTypeLabel = (type: string) => {
     switch (type) {
-      case 'botnet': return 'Botnet/C2';
-      case 'malware': return 'Malware';
-      case 'phishing': return 'Phishing';
-      case 'proxy_abuse': return 'Proxy Abuse';
-      case 'spam': return 'Spam Source';
-      case 'suspicious': return 'Suspicious';
-      default: return 'Unknown';
+      case 'botnet':
+        return 'Botnet/C2';
+      case 'malware':
+        return 'Malware';
+      case 'phishing':
+        return 'Phishing';
+      case 'proxy_abuse':
+        return 'Proxy Abuse';
+      case 'spam':
+        return 'Spam Source';
+      case 'suspicious':
+        return 'Suspicious';
+      default:
+        return 'Unknown';
     }
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Top1K Threat Intelligence Feed</h1>
-          <p className="text-muted-foreground mt-1">
-            High-confidence threat indicators ready for immediate use
-          </p>
+          <p className="text-muted-foreground mt-1">Curated Top1K Threat Indicators</p>
         </div>
         <Button onClick={exportCSV} variant="outline" size="sm">
           <Download className="h-4 w-4 mr-2" />
@@ -295,18 +251,13 @@ export default function Threats() {
 
               <div className="relative w-[280px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search indicators, country, ASN..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
+                <Input placeholder="Search indicators, country, ASN..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
               </div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)}>
             <TabsList className="mb-4">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="ipv4">IPv4 Addresses</TabsTrigger>
@@ -314,12 +265,9 @@ export default function Threats() {
             </TabsList>
 
             <TabsContent value={activeTab} className="space-y-4">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
+              {loading ? <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <div className="rounded-md border">
+                </div> : <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -334,15 +282,11 @@ export default function Threats() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredThreats.length === 0 ? (
-                        <TableRow>
+                      {filteredThreats.length === 0 ? <TableRow>
                           <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                             No threats found matching your filters
                           </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredThreats.map((threat) => (
-                          <TableRow key={threat.indicator}>
+                        </TableRow> : filteredThreats.map(threat => <TableRow key={threat.indicator}>
                             <TableCell className="font-mono text-sm">
                               {threat.indicator}
                             </TableCell>
@@ -368,11 +312,9 @@ export default function Threats() {
                             </TableCell>
                             <TableCell className="font-mono text-xs">
                               {threat.asn || '-'}
-                              {threat.asn_name && (
-                                <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {threat.asn_name && <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                                   {threat.asn_name}
-                                </div>
-                              )}
+                                </div>}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
@@ -382,17 +324,13 @@ export default function Threats() {
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(threat.last_seen).toLocaleDateString()}
                             </TableCell>
-                          </TableRow>
-                        ))
-                      )}
+                          </TableRow>)}
                     </TableBody>
                   </Table>
-                </div>
-              )}
+                </div>}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
