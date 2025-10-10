@@ -195,6 +195,9 @@ export default function Threats() {
           <p className="text-muted-foreground mt-1">
             High-confidence threat indicators from multiple intelligence sources
           </p>
+          <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
+            <strong>Validated Indicators:</strong> These are raw indicators that successfully passed comprehensive validation through multiple security validators (VirusTotal, AbuseIPDB, URLScan, etc.). Only ~1-2% of raw indicators achieve the required confidence threshold (≥70%), validator consensus, and sufficient malicious scores to be promoted here. This strict filtering ensures high-quality, actionable threat intelligence.
+          </p>
         </div>
         <Button onClick={exportCSV} variant="outline" size="sm">
           <Download className="h-4 w-4 mr-2" />
