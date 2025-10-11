@@ -5,7 +5,7 @@ const steps = [
   { icon: Download, label: 'Ingest', description: '50+ sources' },
   { icon: Filter, label: 'Normalize', description: 'Dedup & format' },
   { icon: Target, label: 'Score', description: 'Confidence rating' },
-  { icon: CheckCircle, label: 'Validate', description: 'Multi-vendor' },
+  { icon: CheckCircle, label: 'Validate', description: 'True Threat Formula ©' },
   { icon: Upload, label: 'Publish', description: 'API & feeds' },
 ];
 
