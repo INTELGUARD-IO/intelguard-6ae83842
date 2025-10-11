@@ -156,13 +156,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Trust Bar */}
-      <section className="py-12 border-b border-border/50">
-        <div className="container mx-auto px-4">
-          <BadgeStrip />
-        </div>
-      </section>
-
       {/* Value Proposition */}
       <section className="py-20">
         <div className="container mx-auto px-4">
@@ -505,6 +498,13 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Certifications */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <BadgeStrip />
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-border/50 py-12 bg-card/30">
         <div className="container mx-auto px-4">
@@ -551,8 +551,7 @@ const Index = () => {
           </div>
 
           <div className="border-t border-border/50 pt-8">
-            <BadgeStrip />
-            <p className="text-xs text-center text-muted-foreground mt-6 italic">
+            <p className="text-xs text-center text-muted-foreground italic">
               All trademarks, logos and brand names are the property of their respective owners. 
               Use of these names, logos, and brands does not imply endorsement.
             </p>
