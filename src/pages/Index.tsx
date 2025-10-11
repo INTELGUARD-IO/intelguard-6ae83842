@@ -153,7 +153,7 @@ const Index = () => {
             <div className="flex flex-wrap gap-6 justify-center items-center text-sm text-muted-foreground pt-8">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-accent" />
-                <span>Multi-vendor validation</span>
+                <span>1-click firewall & SIEM</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-accent" />
