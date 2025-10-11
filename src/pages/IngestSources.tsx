@@ -562,7 +562,7 @@ export default function IngestSources() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle>Database Raw Indicators</CardTitle>
@@ -650,6 +650,32 @@ export default function IngestSources() {
                   {rawIndicatorStats.uniqueDomains.toLocaleString()} unique domains
                   {' • '}
                   from {domainSources.length} feeds
+                </>
+              ) : (
+                'Loading...'
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-primary/5 to-secondary/10 border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>Deduplication Ratio</CardTitle>
+              <CardDescription>Duplicates removed</CardDescription>
+            </div>
+            <Filter className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary mb-2">
+              {rawIndicatorStats && rawIndicatorStats.total > 0 
+                ? (((rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains) / rawIndicatorStats.total) * 100).toFixed(1)
+                : '0'}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rawIndicatorStats ? (
+                <>
+                  {(rawIndicatorStats.total - rawIndicatorStats.uniqueIpv4 - rawIndicatorStats.uniqueDomains).toLocaleString()} duplicates removed
                 </>
               ) : (
                 'Loading...'
