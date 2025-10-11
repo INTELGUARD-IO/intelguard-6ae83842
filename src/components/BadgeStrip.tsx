@@ -1,12 +1,12 @@
-import intelguardCysa from '@/assets/certifications/intelguard-cysa.png';
-import intelguardPentest from '@/assets/certifications/intelguard-pentest.png';
-import intelguardNetwork from '@/assets/certifications/intelguard-network.png';
-import intelguardCasp from '@/assets/certifications/intelguard-casp.png';
-import intelguardSecurity from '@/assets/certifications/intelguard-security.png';
-import intelguardCcnpSecurity from '@/assets/certifications/intelguard-ccnp-security.png';
-import intelguardCcie from '@/assets/certifications/intelguard-ccie.png';
-import intelguardCybersecurityAssociate from '@/assets/certifications/intelguard-cybersecurity-associate.png';
-import intelguardCcnpServiceProvider from '@/assets/certifications/intelguard-ccnp-service-provider.png';
+import intelguardCysa from '@/assets/certifications/cysa-test.png';
+import intelguardPentest from '@/assets/certifications/pentest-test.png';
+import intelguardNetwork from '@/assets/certifications/network-test.png';
+import intelguardCasp from '@/assets/certifications/casp-test.png';
+import intelguardSecurity from '@/assets/certifications/security-test.png';
+import intelguardCcnpSecurity from '@/assets/certifications/ccnp-security-test.png';
+import intelguardCcie from '@/assets/certifications/ccie-test.png';
+import intelguardCybersecurityAssociate from '@/assets/certifications/cybersecurity-associate-test.png';
+import intelguardCcnpServiceProvider from '@/assets/certifications/ccnp-service-provider-test.png';
 
 const certifications = [
   { name: 'CompTIA CySA+', src: intelguardCysa },
