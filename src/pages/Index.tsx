@@ -12,6 +12,7 @@ import { MetricTiles } from '@/components/MetricTiles';
 import { LogoStrip } from '@/components/LogoStrip';
 import { CTABand } from '@/components/CTABand';
 import { CodeBlock } from '@/components/CodeBlock';
+import { TestimonialSection } from '@/components/TestimonialSection';
 import { motion } from 'framer-motion';
 
 const Index = () => {
@@ -271,6 +272,9 @@ const Index = () => {
           <PipelineVisual />
         </div>
       </section>
+
+      {/* Testimonial */}
+      <TestimonialSection />
 
       {/* Key Capabilities */}
       <section className="py-20 bg-card/30">
