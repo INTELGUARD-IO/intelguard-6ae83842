@@ -13,6 +13,7 @@ import { LogoStrip } from '@/components/LogoStrip';
 import { CTABand } from '@/components/CTABand';
 import { CodeBlock } from '@/components/CodeBlock';
 import { TestimonialSection } from '@/components/TestimonialSection';
+import { AwardsStrip } from '@/components/AwardsStrip';
 import { motion } from 'framer-motion';
 
 const Index = () => {
@@ -313,6 +314,9 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Awards */}
+      <AwardsStrip />
 
       {/* Live Feed Preview */}
       <section className="py-20">
