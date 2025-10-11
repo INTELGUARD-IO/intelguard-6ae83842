@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import g2Fall2025Leader from '@/assets/awards/g2-fall-2025-leader.png';
 import g2AsiaPacificHighPerformer from '@/assets/awards/g2-asia-pacific-high-performer.png';
 import g2AsiaPacificWinter2025 from '@/assets/awards/g2-asia-pacific-winter-2025.png';
@@ -16,9 +17,17 @@ export const AwardsStrip = () => {
           Recognized by practitioners. Built for defenders.
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto items-center">
-          {awards.map((award) => (
-            <div
+          {awards.map((award, index) => (
+            <motion.div
               key={award.name}
+              initial={{ scale: 0.8, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ 
+                duration: 0.6, 
+                ease: "easeOut",
+                delay: index * 0.15 
+              }}
               className="flex items-center justify-center px-4 py-6 hover:scale-105 transition-transform"
             >
               <img
@@ -26,7 +35,7 @@ export const AwardsStrip = () => {
                 alt={award.name}
                 className="h-48 w-auto object-contain"
               />
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
