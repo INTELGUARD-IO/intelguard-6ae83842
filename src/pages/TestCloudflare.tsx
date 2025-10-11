@@ -12,6 +12,42 @@ const TestCloudflare = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scanUuid, setScanUuid] = useState<string | null>(null);
+
+  const pollResult = async (uuid: string) => {
+    const maxAttempts = 20;
+    const pollInterval = 3000; // 3 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      console.log(`Polling attempt ${attempt + 1}/${maxAttempts}...`);
+      
+      const url = new URL(window.location.origin);
+      url.pathname = '/functions/v1/urlscan-result';
+      url.searchParams.set('uuid', uuid);
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'ready') {
+        return data;
+      }
+
+      if (data.status === 'failed') {
+        throw new Error('Scan failed');
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    throw new Error('Scan timeout - results not ready after 60 seconds');
+  };
 
   const handleTest = async () => {
     if (!indicator) {
@@ -22,45 +58,46 @@ const TestCloudflare = () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setScanUuid(null);
 
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke(
-        "test-cloudflare-scan",
+      // Step 1: Submit scan
+      const { data: submitData, error: submitError } = await supabase.functions.invoke(
+        "urlscan-submit",
         {
-          body: { indicator, kind }
+          body: { indicator }
         }
       );
 
-      if (invokeError) {
-        console.error("Invoke error:", invokeError);
-        setError(invokeError.message || "Errore durante la chiamata alla funzione");
-        return;
-      }
-
-      // Handle HTTP errors from the edge function
-      if (data && !data.success) {
-        console.error("Edge function error:", data);
-        
-        // Handle 403 errors specifically
-        if (data.status === 403) {
+      if (submitError) {
+        console.error("Submit error:", submitError);
+        if (submitError.message?.includes('403') || submitError.message?.includes('authentication')) {
           setError(
             `❌ Errore di autenticazione Cloudflare (403):\n\n` +
             `Il token API non ha i permessi corretti.\n\n` +
             `Verifica che il token abbia gli scope:\n` +
             `• URL Scanner: Read\n` +
-            `• URL Scanner: Write\n\n` +
-            `Account ID utilizzato: ${data.requestUrl?.includes('/accounts/') ? 
-              data.requestUrl.split('/accounts/')[1]?.split('/')[0] : 'N/A'}`
+            `• URL Scanner: Write`
           );
         } else {
-          setError(data.error || "Errore sconosciuto dalla scansione");
+          setError(submitError.message || "Errore durante l'invio della scansione");
         }
-        setResult(data);
         return;
       }
+
+      if (!submitData || !submitData.uuid) {
+        setError("Nessun UUID ricevuto dalla submission");
+        return;
+      }
+
+      const uuid = submitData.uuid;
+      setScanUuid(uuid);
+      console.log(`Scan submitted with UUID: ${uuid}`);
+
+      // Step 2: Poll for results
+      const scanResult = await pollResult(uuid);
+      setResult(scanResult);
       
-      console.log("Scan result:", data);
-      setResult(data);
     } catch (err: any) {
       console.error("Errore durante la scansione:", err);
       setError(err.message || "Errore durante la scansione Cloudflare");
@@ -136,7 +173,7 @@ const TestCloudflare = () => {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scansione in corso...
+                  {scanUuid ? `Polling risultati (UUID: ${scanUuid.substring(0, 8)}...)` : 'Invio scansione...'}
                 </>
               ) : (
                 <>
@@ -157,18 +194,54 @@ const TestCloudflare = () => {
               <Card className="border-accent/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    {result.success ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
+                    {result.malicious ? (
                       <AlertCircle className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
                     )}
                     Risultato Scansione
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="col-span-2">
+                      <span className="font-semibold">UUID:</span> {result.uuid}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Status:</span> {result.status}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Verdict:</span> {result.verdicts}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Malicious:</span>{" "}
+                      <span className={result.malicious ? "text-red-500" : "text-green-500"}>
+                        {result.malicious ? "Sì" : "No"}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-semibold">Final URL:</span> {result.final_url}
+                    </div>
+                    {result.page_title && (
+                      <div className="col-span-2">
+                        <span className="font-semibold">Page Title:</span> {result.page_title}
+                      </div>
+                    )}
+                    {result.categories?.length > 0 && (
+                      <div className="col-span-2">
+                        <span className="font-semibold">Categories:</span>{" "}
+                        {result.categories.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                      Mostra JSON completo
+                    </summary>
+                    <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-96 text-sm mt-2">
+                      {JSON.stringify(result, null, 2)}
+                    </pre>
+                  </details>
                 </CardContent>
               </Card>
             )}

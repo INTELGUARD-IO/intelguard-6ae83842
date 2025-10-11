@@ -146,3 +146,9 @@ verify_jwt = false
 
 [functions.test-cloudflare-scan]
 verify_jwt = false
+
+[functions.urlscan-submit]
+verify_jwt = false
+
+[functions.urlscan-result]
+verify_jwt = false
