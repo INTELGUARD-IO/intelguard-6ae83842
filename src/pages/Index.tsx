@@ -197,13 +197,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Certifications */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <BadgeStrip />
-        </div>
-      </section>
-
       {/* Problem → Outcome */}
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
@@ -502,6 +495,13 @@ const Index = () => {
               ))}
             </Accordion>
           </div>
+        </div>
+      </section>
+
+      {/* Certifications */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <BadgeStrip />
         </div>
       </section>
 
