@@ -150,7 +150,7 @@ const Index = () => {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Reduced trial, no credit card. Not for production use.
+              Reduced trial, no credit card. True Threat Feeds™.
             </p>
           </motion.div>
         </div>
