@@ -14,6 +14,7 @@ import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, Arr
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useUserRole } from '@/hooks/useUserRole';
+import { runIngestNow } from '@/utils/runIngest';
 
 interface IngestSource {
   id: string;
@@ -47,6 +48,8 @@ export default function IngestSources() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [runningIngest, setRunningIngest] = useState(false);
+  const [runningSpotIngest, setRunningSpotIngest] = useState(false);
+  const [neverRunCount, setNeverRunCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadConfig, setUploadConfig] = useState({
     kind: 'ipv4' as 'ipv4' | 'domain',
@@ -73,6 +76,10 @@ export default function IngestSources() {
 
       if (error) throw error;
       setSources((data || []) as IngestSource[]);
+      
+      // Count never-run sources
+      const neverRun = (data || []).filter(s => s.enabled && !s.last_run).length;
+      setNeverRunCount(neverRun);
     } catch (error) {
       console.error('Error loading sources:', error);
       toast.error('Failed to load sources');
@@ -346,6 +353,28 @@ export default function IngestSources() {
     }
   };
 
+  async function handleRunNeverExecuted() {
+    if (runningSpotIngest) {
+      toast.info('Spot ingest already running');
+      return;
+    }
+
+    setRunningSpotIngest(true);
+    try {
+      await runIngestNow();
+      
+      // Refresh sources and stats
+      await Promise.all([
+        loadSources(),
+        loadRawIndicatorStats(true)
+      ]);
+    } catch (error) {
+      console.error('Spot ingest error:', error);
+    } finally {
+      setRunningSpotIngest(false);
+    }
+  };
+
   if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -387,6 +416,16 @@ export default function IngestSources() {
         <div className="flex gap-2">
           {isSuperAdmin && (
             <>
+              {neverRunCount > 0 && (
+                <Button 
+                  onClick={handleRunNeverExecuted}
+                  disabled={runningSpotIngest}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${runningSpotIngest ? 'animate-spin' : ''}`} />
+                  {runningSpotIngest ? 'Running...' : `⚡ Run ${neverRunCount} Never-Executed`}
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 onClick={runAllSources}

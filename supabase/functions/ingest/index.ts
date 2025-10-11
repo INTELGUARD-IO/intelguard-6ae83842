@@ -215,14 +215,44 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
-    console.log('[ingest] Starting optimized ingestion run with rotation…');
+    // Parse request body for force flag
+    let force = false;
+    try {
+      const body = await req.json();
+      force = body?.force || false;
+    } catch {
+      // Ignore parsing errors (cron jobs don't send body)
+    }
 
-    // Fetch enabled sources sorted by priority (desc) and last_attempt (asc, nulls first)
-    // This ensures high-priority sources and sources not recently attempted are processed first
-    const { data: allSources, error: sourcesError } = await supabase
+    console.log('[ingest] Starting optimized ingestion run with rotation…', force ? '(FORCE MODE: prioritizing never-run sources)' : '');
+
+    // Build order clause based on force flag
+    let query = supabase
       .from('ingest_sources')
       .select('*')
-      .eq('enabled', true)
+      .eq('enabled', true);
+
+    if (force) {
+      // Force mode: prioritize sources that have never been run (last_attempt IS NULL)
+      const { data: neverRunSources, error: neverRunError } = await query
+        .is('last_attempt', null)
+        .order('priority', { ascending: false });
+
+      if (neverRunError) throw neverRunError;
+
+      // If we have never-run sources, use them; otherwise fall back to normal query
+      if (neverRunSources && neverRunSources.length > 0) {
+        console.log(`[ingest] Force mode: found ${neverRunSources.length} never-run sources`);
+        query = supabase
+          .from('ingest_sources')
+          .select('*')
+          .eq('enabled', true)
+          .order('priority', { ascending: false })
+          .order('last_attempt', { ascending: true, nullsFirst: true });
+      }
+    }
+
+    const { data: allSources, error: sourcesError } = await query
       .order('priority', { ascending: false })
       .order('last_attempt', { ascending: true, nullsFirst: true });
 
@@ -240,7 +270,9 @@ Deno.serve(async (req) => {
     }
 
     // Process only MAX_SOURCES_PER_RUN sources per invocation to avoid timeout
-    const sources = allSources.slice(0, MAX_SOURCES_PER_RUN);
+    // In force mode, increase batch size to 50 to process more never-run sources
+    const maxSources = force ? 50 : MAX_SOURCES_PER_RUN;
+    const sources = allSources.slice(0, maxSources);
     console.log(`[ingest] Processing ${sources.length} of ${allSources.length} enabled sources (batch rotation)`);
 
     const nowIso = new Date().toISOString();
