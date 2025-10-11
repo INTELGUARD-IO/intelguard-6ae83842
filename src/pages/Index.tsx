@@ -97,7 +97,7 @@ const Index = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-6 w-6 text-accent" />
-            <span className="font-bold text-xl text-foreground">INTELGUARD</span>
+            <span className="font-bold text-xl bg-gradient-primary bg-clip-text text-transparent">INTELGUARD</span>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate('/auth')}>
