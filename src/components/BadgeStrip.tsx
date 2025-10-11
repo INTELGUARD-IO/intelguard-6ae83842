@@ -38,7 +38,7 @@ export const BadgeStrip = () => {
             <img
               src={cert.src}
               alt={cert.name}
-              className="h-20 w-auto object-contain max-w-full"
+              className="h-20 w-auto object-contain max-w-full mix-blend-multiply dark:mix-blend-screen"
               loading="lazy"
             />
           </div>
