@@ -35,12 +35,12 @@ export const BadgeStrip = () => {
         {certifications.map((cert) => (
           <div
             key={cert.name}
-            className="flex items-center justify-center w-full min-h-[140px] px-6 py-6 bg-card/80 backdrop-blur-sm rounded-xl border border-border hover:bg-card hover:border-primary/20 transition-all group"
+            className="flex items-center justify-center w-full min-h-[140px] px-6 py-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all"
           >
             <img
               src={cert.src}
               alt={cert.name}
-              className="h-16 w-auto object-contain max-w-full filter brightness-0 invert dark:brightness-100 dark:invert-0 group-hover:scale-105 transition-transform"
+              className="h-16 w-auto object-contain max-w-full"
               loading="lazy"
             />
           </div>
