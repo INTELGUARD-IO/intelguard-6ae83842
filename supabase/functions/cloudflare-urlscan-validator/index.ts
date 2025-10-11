@@ -56,6 +56,55 @@ Deno.serve(async (req) => {
   }
 
   const startTime = Date.now();
+  let manualTrigger = false;
+
+  // Verify authorization: cron secret OR authenticated admin user
+  const cronSecret = req.headers.get('x-cron-secret');
+  const authHeader = req.headers.get('authorization');
+  
+  let isAuthorized = false;
+  
+  // Check cron secret first
+  if (cronSecret === Deno.env.get('CRON_SECRET')) {
+    isAuthorized = true;
+    console.log('🔐 Authorized via cron secret');
+  } 
+  // Otherwise check for admin authentication
+  else if (authHeader) {
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      
+      const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      if (userError) throw userError;
+      
+      // Check if user is admin
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile?.role === 'admin') {
+        isAuthorized = true;
+        manualTrigger = true;
+        console.log(`🔧 MANUAL TRIGGER by admin: ${user.email}`);
+      }
+    } catch (e) {
+      console.error('❌ Auth verification failed:', e);
+    }
+  }
+  
+  if (!isAuthorized) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - Admin access required' }), 
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -81,7 +130,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('🚀 Cloudflare URL Scanner Validator started');
+    console.log(`🚀 Cloudflare URL Scanner Validator started${manualTrigger ? ' (MANUAL TRIGGER)' : ''}`);
     console.log(`⚙️  Config: BATCH_SIZE=${BATCH_SIZE}, DELAY=${SCAN_DELAY_MS}ms`);
 
     // Step 1: Clean expired cache
@@ -378,6 +427,7 @@ Deno.serve(async (req) => {
     const totalDuration = Math.round((Date.now() - startTime) / 1000);
     const finalSummary = {
       success: true,
+      manual_trigger: manualTrigger,
       batches_processed: batchCount,
       total_processed: totalScanned + totalCached + totalFailed,
       scanned: totalScanned,
@@ -386,7 +436,7 @@ Deno.serve(async (req) => {
       duration_seconds: totalDuration,
     };
 
-    console.log('\n✅ ===== RUN COMPLETE =====');
+    console.log(`\n✅ ===== RUN COMPLETE${manualTrigger ? ' (MANUAL)' : ''} =====`);
     console.log('📊 Final Summary:', finalSummary);
     console.log(`⏱️  Total duration: ${totalDuration}s`);
 
