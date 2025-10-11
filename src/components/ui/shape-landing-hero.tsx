@@ -177,11 +177,11 @@ function HeroGeometric({
                 {title2.split("").map((char, index) => (
                   <motion.span
                     key={index}
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
+                    initial={{ y: 50, opacity: 0, filter: "blur(20px)" }}
+                    animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
                     transition={{
-                      duration: 0.8,
-                      delay: 1.2 + index * 0.05,
+                      duration: 1,
+                      delay: 1.8 + index * 0.08,
                       ease: [0.23, 1, 0.32, 1] as const,
                     }}
                     className="inline-block"
