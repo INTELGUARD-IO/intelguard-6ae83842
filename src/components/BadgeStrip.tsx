@@ -29,11 +29,11 @@ export const BadgeStrip = () => {
       </h3>
       
       {/* Griglia loghi certificazioni */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 max-w-6xl mx-auto place-items-center">
+      <div className="flex flex-wrap justify-center gap-6 max-w-6xl mx-auto">
         {certifications.map((cert) => (
           <div
             key={cert.name}
-            className="flex items-center justify-center w-full min-h-[102px] px-2 py-4 bg-white rounded-xl shadow-sm"
+            className="flex items-center justify-center w-[180px] min-h-[102px] px-1 py-3 bg-white rounded-xl shadow-sm"
           >
             <img
               src={cert.src}
