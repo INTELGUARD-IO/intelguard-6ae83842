@@ -197,10 +197,16 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Certifications */}
+      {/* Integration Logos */}
       <section className="py-20">
         <div className="container mx-auto px-4">
-          <BadgeStrip />
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Automate your Threat Protection
+            </h2>
+          </div>
+
+          <LogoStrip />
         </div>
       </section>
 
@@ -342,18 +348,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Integration Logos */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Automate your Threat Protection
-            </h2>
-          </div>
-
-          <LogoStrip />
-        </div>
-      </section>
 
       {/* Developer Quickstart */}
       <section className="py-20 bg-card/30">
@@ -502,6 +496,13 @@ const Index = () => {
               ))}
             </Accordion>
           </div>
+        </div>
+      </section>
+
+      {/* Certifications */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <BadgeStrip />
         </div>
       </section>
 
