@@ -31,16 +31,16 @@ export const BadgeStrip = () => {
       </h3>
       
       {/* Griglia loghi certificazioni */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 max-w-6xl mx-auto items-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 max-w-6xl mx-auto place-items-center">
         {certifications.map((cert) => (
           <div
             key={cert.name}
-            className="flex items-center justify-center px-4 py-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-all"
+            className="flex items-center justify-center w-full min-h-[140px] px-6 py-6 bg-card/80 backdrop-blur-sm rounded-xl border border-border hover:bg-card hover:border-primary/20 transition-all group"
           >
             <img
               src={cert.src}
               alt={cert.name}
-              className="h-20 w-auto object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
+              className="h-16 w-auto object-contain max-w-full filter brightness-0 invert dark:brightness-100 dark:invert-0 group-hover:scale-105 transition-transform"
               loading="lazy"
             />
           </div>
