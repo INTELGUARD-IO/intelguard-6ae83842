@@ -13,7 +13,7 @@ export const AwardsStrip = () => {
   return (
     <section className="py-16 px-4">
       <div className="max-w-7xl mx-auto text-center space-y-12">
-        <h2 className="text-3xl md:text-4xl font-bold">
+        <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary">
           Recognized by practitioners. Built for defenders.
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto items-center">

@@ -24,7 +24,7 @@ export const BadgeStrip = () => {
   return (
     <div className="space-y-8">
       {/* Titolo principale */}
-      <h3 className="text-2xl md:text-3xl font-bold text-center text-foreground">
+      <h3 className="text-2xl md:text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-primary">
         Intelguard: Certified expertise. Practical defense.
       </h3>
       

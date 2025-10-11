@@ -15,7 +15,7 @@ export function TestimonialSection() {
           <Card className="border-border/50 bg-card">
             <CardContent className="p-8 md:p-12 space-y-6">
               {/* Heading principale */}
-              <h3 className="text-3xl md:text-5xl font-bold text-foreground leading-tight">
+              <h3 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-primary leading-tight">
                 "A firewall is not enough."
               </h3>
               
