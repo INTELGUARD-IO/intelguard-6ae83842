@@ -15,6 +15,7 @@ import IngestSources from "./pages/IngestSources";
 import Monitoring from "./pages/Monitoring";
 import NetworkStatus from "./pages/NetworkStatus";
 import Validators from "./pages/Validators";
+import TestHome from "./pages/TestHome";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/test/home" element={<TestHome />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/indicators" element={<Indicators />} />
