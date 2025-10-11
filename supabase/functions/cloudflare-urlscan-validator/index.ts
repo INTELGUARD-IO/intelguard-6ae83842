@@ -27,26 +27,27 @@ interface ScanSubmission {
 }
 
 interface ScanResult {
-  uuid: string;
-  status: string;
-  time: string;
-  url: string;
+  scan?: {
+    status: string;
+    uuid: string;
+    verdict?: string;
+    categories?: string[];
+  };
+  page?: {
+    url: string;
+    asn?: string;
+    asnname?: string;
+    ip?: string;
+  };
+  meta?: {
+    processors?: any;
+  };
   task?: {
     uuid: string;
-    visibility: string;
     url: string;
-    success: boolean;
-    effectiveUrl?: string;
-    screenshot?: string;
-  };
-  scan?: {
-    summary?: {
-      malicious?: boolean;
-      categories?: string[];
-      verdict?: string;
-    };
-    technologies?: any[];
-    certificates?: any[];
+    time: string;
+    screenshotURL?: string;
+    domURL?: string;
   };
 }
 
@@ -239,11 +240,11 @@ Deno.serve(async (req) => {
             ? `http://${indicator.indicator}` 
             : `https://${indicator.indicator}`;
 
-          // Submit scan with retry logic
-          const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan`;
+          // Submit scan with retry logic (API v2)
+          const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/v2/scan`;
           
           let scanResponse;
-          let scanData: { result: ScanSubmission } | null = null;
+          let scanData: ScanSubmission | null = null;
           let retryCount = 0;
           
           while (retryCount <= MAX_RETRIES) {
@@ -258,7 +259,6 @@ Deno.serve(async (req) => {
                 body: JSON.stringify({
                   url: scanTargetUrl,
                   visibility: 'unlisted',
-                  customHeaders: {},
                 }),
               });
 
@@ -316,16 +316,16 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const scanUuid = scanData.result.uuid;
+          const scanUuid = scanData.uuid;
           console.log(`  ✓ Scan submitted, UUID: ${scanUuid}`);
 
-          // Poll for results (max 24s)
+          // Poll for results (max 24s) - API v2
           let result: ScanResult | null = null;
 
           for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_DELAY_MS));
 
-            const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan/${scanUuid}`;
+            const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/v2/result/${scanUuid}`;
             const resultResponse = await fetch(resultUrl, {
               headers: {
                 'Authorization': `Bearer ${cloudflareToken}`,
@@ -333,20 +333,24 @@ Deno.serve(async (req) => {
             });
 
             if (resultResponse.ok) {
-              const resultData: { result: ScanResult } = await resultResponse.json();
+              const resultData = await resultResponse.json();
               
-              if (resultData.result.task?.success) {
-                result = resultData.result;
-                console.log(`  ✓ Scan completed`);
+              // Check if scan is complete (API v2)
+              if (resultData.scan?.status === 'COMPLETE') {
+                result = resultData;
+                console.log(`  ✓ Scan completed (verdict: ${resultData.scan?.verdict || 'unknown'})`);
                 break;
-              } else if (resultData.result.status === 'failed') {
+              } else if (resultData.scan?.status === 'FAILED') {
                 console.error(`  ❌ Scan failed`);
                 break;
               }
+              // Otherwise scan is still pending, continue polling
+            } else {
+              console.error(`  ⚠️  Poll attempt ${attempt + 1} failed: ${resultResponse.status}`);
             }
           }
 
-          if (!result || !result.task?.success) {
+          if (!result || result.scan?.status !== 'COMPLETE') {
             console.error(`  ⏱️  Scan timeout/failed for ${indicator.indicator}`);
             batchFailed++;
             totalFailed++;
@@ -362,18 +366,17 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Analyze results
-          const summary = result.scan?.summary;
-          const malicious = summary?.malicious || false;
-          const categories = summary?.categories || [];
-          const verdict = summary?.verdict || 'clean';
+          // Analyze results (API v2 structure)
+          const verdict = result.scan?.verdict || 'clean';
+          const categories = result.scan?.categories || [];
+          const malicious = verdict === 'malicious';
 
           // Calculate score (0-100)
           let score = 0;
-          if (malicious) {
-            score = 85;
-            if (categories.includes('Phishing')) score = Math.min(100, score + 15);
-            if (categories.includes('Malware')) score = Math.min(100, score + 15);
+          if (malicious || verdict === 'suspicious') {
+            score = verdict === 'malicious' ? 85 : 60;
+            if (categories.includes('phishing')) score = Math.min(100, score + 15);
+            if (categories.includes('malware')) score = Math.min(100, score + 15);
           }
 
           console.log(`  ✓ Result: ${verdict} (score: ${score})`);
@@ -384,13 +387,13 @@ Deno.serve(async (req) => {
             .upsert({
               indicator: indicator.indicator,
               kind: indicator.kind,
-              scan_id: result.uuid,
+              scan_id: result.scan?.uuid,
               verdict,
               score,
               malicious,
               categories,
-              technologies: result.scan?.technologies || null,
-              certificates: result.scan?.certificates || null,
+              technologies: result.meta?.processors || null,
+              certificates: null,
               raw_response: result,
               checked_at: new Date().toISOString(),
               expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
