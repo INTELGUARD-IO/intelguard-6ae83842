@@ -13,7 +13,7 @@ export const PipelineVisual = () => {
   return (
     <div className="relative py-12">
       <h2 className="text-3xl font-bold text-center mb-12 text-foreground">
-        True Threat Feeds ©
+        Our True Threat Feed Formula
       </h2>
       <div className="flex items-center justify-between max-w-5xl mx-auto">
         {steps.map((step, index) => {
