@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
   let isAuthorized = false;
   
   // Check cron secret first
-  if (cronSecret === Deno.env.get('CRON_SECRET')) {
+  if (cronSecret && cronSecret === Deno.env.get('CRON_SECRET')) {
     isAuthorized = true;
     console.log('🔐 Authorized via cron secret');
   } 
@@ -73,26 +73,42 @@ Deno.serve(async (req) => {
   else if (authHeader) {
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       
-      const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      // Use service role key to verify user and check admin status
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
         global: { headers: { Authorization: authHeader } }
       });
       
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-      if (userError) throw userError;
+      if (userError) {
+        console.error('❌ Auth user fetch failed:', userError);
+        throw userError;
+      }
+      
+      if (!user) {
+        console.error('❌ No user found');
+        throw new Error('No user found');
+      }
       
       // Check if user is admin
-      const { data: profile } = await supabaseClient
+      const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
       
+      if (profileError) {
+        console.error('❌ Profile fetch failed:', profileError);
+        throw profileError;
+      }
+      
       if (profile?.role === 'admin') {
         isAuthorized = true;
         manualTrigger = true;
         console.log(`🔧 MANUAL TRIGGER by admin: ${user.email}`);
+      } else {
+        console.error(`❌ User ${user.email} is not admin (role: ${profile?.role})`);
       }
     } catch (e) {
       console.error('❌ Auth verification failed:', e);
@@ -100,6 +116,7 @@ Deno.serve(async (req) => {
   }
   
   if (!isAuthorized) {
+    console.error('❌ UNAUTHORIZED: No valid cron secret or admin authentication');
     return new Response(
       JSON.stringify({ error: 'Unauthorized - Admin access required' }), 
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
