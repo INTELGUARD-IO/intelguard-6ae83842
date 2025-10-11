@@ -601,17 +601,10 @@ export default function IngestSources() {
             <Globe className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-2xl font-bold">
-                {rawIndicatorStats ? rawIndicatorStats.ipv4.toLocaleString() : '...'}
-              </div>
-              {rawIndicatorStats && rawIndicatorStats.ipv4 > 0 && rawIndicatorStats.uniqueIpv4 > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% unique
-                </Badge>
-              )}
+            <div className="text-2xl font-bold mb-2">
+              {rawIndicatorStats ? rawIndicatorStats.ipv4.toLocaleString() : '...'}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-2">
               {rawIndicatorStats ? (
                 <>
                   {rawIndicatorStats.uniqueIpv4.toLocaleString()} unique addresses
@@ -622,6 +615,11 @@ export default function IngestSources() {
                 'Loading...'
               )}
             </p>
+            {rawIndicatorStats && rawIndicatorStats.ipv4 > 0 && rawIndicatorStats.uniqueIpv4 > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% unique
+              </Badge>
+            )}
           </CardContent>
         </Card>
 
@@ -634,17 +632,10 @@ export default function IngestSources() {
             <Globe className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-2xl font-bold">
-                {rawIndicatorStats ? rawIndicatorStats.domain.toLocaleString() : '...'}
-              </div>
-              {rawIndicatorStats && rawIndicatorStats.domain > 0 && rawIndicatorStats.uniqueDomains > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% unique
-                </Badge>
-              )}
+            <div className="text-2xl font-bold mb-2">
+              {rawIndicatorStats ? rawIndicatorStats.domain.toLocaleString() : '...'}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-2">
               {rawIndicatorStats ? (
                 <>
                   {rawIndicatorStats.uniqueDomains.toLocaleString()} unique domains
@@ -655,6 +646,11 @@ export default function IngestSources() {
                 'Loading...'
               )}
             </p>
+            {rawIndicatorStats && rawIndicatorStats.domain > 0 && rawIndicatorStats.uniqueDomains > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% unique
+              </Badge>
+            )}
           </CardContent>
         </Card>
 
