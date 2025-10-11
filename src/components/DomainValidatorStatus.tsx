@@ -9,62 +9,23 @@ export const DomainValidatorStatus = () => {
   const { data: stats } = useQuery({
     queryKey: ['domain-validator-status'],
     queryFn: async () => {
-      // Get total domains
-      const { count: totalDomains } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .gte('confidence', 50)
-        .eq('whitelisted', false);
-
-      // Get domains checked by SafeBrowsing
-      const { count: safebrowsingChecked } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .eq('safebrowsing_checked', true);
-
-      const { count: safebrowsingMalicious } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .eq('safebrowsing_checked', true)
-        .not('safebrowsing_verdict', 'eq', 'clean');
-
-      // Get domains checked by Cloudflare URLScan
-      const { count: cloudflareChecked } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .eq('cloudflare_urlscan_checked', true);
-
-      const { count: cloudflareMalicious } = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain')
-        .eq('cloudflare_urlscan_checked', true)
-        .eq('cloudflare_urlscan_malicious', true);
-
-      // Get validated domains
-      const { count: validatedDomains } = await supabase
-        .from('validated_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('kind', 'domain');
-
-      return {
-        totalDomains: totalDomains || 0,
-        safebrowsing: {
-          checked: safebrowsingChecked || 0,
-          malicious: safebrowsingMalicious || 0,
-        },
-        cloudflare: {
-          checked: cloudflareChecked || 0,
-          malicious: cloudflareMalicious || 0,
-        },
-        validated: validatedDomains || 0,
+      // Read from cached widget data (updated every 5 minutes)
+      const { data, error } = await supabase
+        .from('widget_cache' as any)
+        .select('data')
+        .eq('widget_name', 'domain_validator_status')
+        .single();
+      
+      if (error) throw error;
+      return (data as any).data as {
+        totalDomains: number;
+        safebrowsing: { checked: number; malicious: number };
+        cloudflare: { checked: number; malicious: number };
+        validated: number;
       };
     },
-    refetchInterval: 10000, // Refresh every 10s
+    refetchInterval: 60000, // Refresh every 60s (cache updated every 5 min)
+    staleTime: 50000, // Consider data fresh for 50s
   });
 
   if (!stats) return null;

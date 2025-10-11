@@ -72,9 +72,9 @@ export default function Indicators() {
         { data: ipv4Data },
         { data: domainData }
       ] = await Promise.all([
-        supabase.rpc('get_paginated_indicators', { p_kind: null, p_page: 1, p_limit: 1 }),
-        supabase.rpc('get_paginated_indicators', { p_kind: 'ipv4', p_page: 1, p_limit: 1 }),
-        supabase.rpc('get_paginated_indicators', { p_kind: 'domain', p_page: 1, p_limit: 1 })
+        supabase.rpc('get_paginated_indicators_v2' as any, { p_kind: null, p_page: 1, p_limit: 1 }),
+        supabase.rpc('get_paginated_indicators_v2' as any, { p_kind: 'ipv4', p_page: 1, p_limit: 1 }),
+        supabase.rpc('get_paginated_indicators_v2' as any, { p_kind: 'domain', p_page: 1, p_limit: 1 })
       ]);
       
       setTotalCount(allData?.[0]?.total_count || 0);
@@ -88,9 +88,9 @@ export default function Indicators() {
   const loadIndicators = async () => {
     setLoading(true);
     try {
-      // Use server-side pagination RPC
+      // Use optimized server-side pagination with materialized view
       const { data, error } = await supabase
-        .rpc('get_paginated_indicators', {
+        .rpc('get_paginated_indicators_v2' as any, {
           p_kind: selectedKind === 'all' ? null : selectedKind,
           p_page: page,
           p_limit: pageSize
