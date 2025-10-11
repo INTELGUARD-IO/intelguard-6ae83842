@@ -31,9 +31,6 @@ export const LogoStrip = () => {
           </div>
         ))}
       </div>
-      <p className="text-xs text-center text-muted-foreground italic">
-        For illustration only. No endorsement implied.
-      </p>
     </div>
   );
 };
