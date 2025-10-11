@@ -17,6 +17,7 @@ import {
 import { ValidatorStatsCard } from '@/components/ValidatorStatsCard';
 import { DomainValidatorStatus } from '@/components/DomainValidatorStatus';
 import { ValidatorCoverageWidget } from '@/components/ValidatorCoverageWidget';
+import { SourcesCell } from '@/components/SourcesCell';
 
 interface Indicator {
   indicator: string;
@@ -29,7 +30,8 @@ interface Indicator {
   asn_name?: string;
   threat_type?: string;
   severity?: string;
-  sources_count?: number;
+  sources?: string[];
+  source_count?: number;
   total_count?: number;
 }
 
@@ -99,8 +101,7 @@ export default function Indicators() {
       const mappedData = (data || []).map((ind: any) => ({
         ...ind,
         first_seen: ind.last_validated,
-        last_seen: ind.last_validated,
-        sources_count: 1
+        last_seen: ind.last_validated
       }));
       
       setIndicators(mappedData);
@@ -143,7 +144,7 @@ export default function Indicators() {
     const ipv4Indicators = indicators.filter(ind => ind.kind === 'ipv4');
     
     const csv = [
-      ['IPv4 Address', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','),
+      ['IPv4 Address', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources Count', 'Sources List', 'First Seen', 'Last Seen'].join(','),
       ...ipv4Indicators.map(ind =>
         [
           ind.indicator,
@@ -153,7 +154,8 @@ export default function Indicators() {
           ind.country || '',
           ind.asn || '',
           ind.asn_name || '',
-          ind.sources_count || 0,
+          ind.source_count || 0,
+          `"${(ind.sources || []).join('; ')}"`,
           new Date(ind.first_seen).toISOString(),
           new Date(ind.last_seen).toISOString(),
         ].join(',')
@@ -172,7 +174,7 @@ export default function Indicators() {
     const domainIndicators = indicators.filter(ind => ind.kind === 'domain');
     
     const csv = [
-      ['Domain', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources', 'First Seen', 'Last Seen'].join(','),
+      ['Domain', 'Confidence', 'Threat Type', 'Severity', 'Country', 'ASN', 'ASN Name', 'Sources Count', 'Sources List', 'First Seen', 'Last Seen'].join(','),
       ...domainIndicators.map(ind =>
         [
           ind.indicator,
@@ -182,7 +184,8 @@ export default function Indicators() {
           ind.country || '',
           ind.asn || '',
           ind.asn_name || '',
-          ind.sources_count || 0,
+          ind.source_count || 0,
+          `"${(ind.sources || []).join('; ')}"`,
           new Date(ind.first_seen).toISOString(),
           new Date(ind.last_seen).toISOString(),
         ].join(',')
@@ -291,6 +294,7 @@ export default function Indicators() {
                         <TableHead>Confidence</TableHead>
                         <TableHead>Country</TableHead>
                         <TableHead>ASN</TableHead>
+                        <TableHead>ASN Name</TableHead>
                         <TableHead>Sources</TableHead>
                         <TableHead>Last Seen</TableHead>
                       </TableRow>
@@ -298,7 +302,7 @@ export default function Indicators() {
                     <TableBody>
                       {filteredIndicators.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                             No indicators found
                           </TableCell>
                         </TableRow>
@@ -346,10 +350,11 @@ export default function Indicators() {
                             <TableCell className="font-mono text-sm">
                               {ind.asn || '-'}
                             </TableCell>
+                            <TableCell className="text-sm">
+                              {ind.asn_name || '-'}
+                            </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">
-                                {ind.sources_count || 0}
-                              </Badge>
+                              <SourcesCell sources={ind.sources} count={ind.source_count} />
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(ind.last_seen).toLocaleDateString()}
