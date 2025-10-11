@@ -2,12 +2,19 @@ import { HeroGeometric } from "@/components/ui/shape-landing-hero";
 import { Button } from "@/components/ui/button";
 import { Shield, Clock, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { IntelguardLogo } from "@/components/ui/intelguard-logo";
 
 const TestHome = () => {
   const navigate = useNavigate();
 
   return (
-    <HeroGeometric
+    <div className="relative min-h-screen">
+      {/* Header con logo */}
+      <header className="absolute top-0 left-0 w-full z-50 p-6 md:p-8">
+        <IntelguardLogo />
+      </header>
+
+      <HeroGeometric
       badge="True Threat Feeds©"
       title1="Block threats."
       title2="Not your business."
@@ -51,6 +58,7 @@ const TestHome = () => {
         </div>
       </div>
     </HeroGeometric>
+    </div>
   );
 };
 
