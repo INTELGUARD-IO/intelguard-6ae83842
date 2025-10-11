@@ -89,7 +89,9 @@ Deno.serve(async (req) => {
     }
 
     const scanData = JSON.parse(responseText);
-    const scanUuid = scanData.result?.uuid;
+    
+    // API v2 returns UUID directly in the root object
+    const scanUuid = scanData.uuid;
 
     if (!scanUuid) {
       return new Response(
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
       console.log(`⏳ Polling attempt ${attempt + 1}/${maxAttempts}...`);
       await new Promise(resolve => setTimeout(resolve, pollDelay));
 
-      const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/urlscanner/scan/${scanUuid}`;
+      const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/urlscanner/v2/result/${scanUuid}`;
       const resultResponse = await fetch(resultUrl, {
         headers: {
           'Authorization': `Bearer ${cfApiToken}`,
@@ -123,17 +125,18 @@ Deno.serve(async (req) => {
       if (resultResponse.ok) {
         const resultData = await resultResponse.json();
         
-        if (resultData.result?.task?.success) {
-          result = resultData.result;
+        // API v2 returns scan data directly
+        if (resultData.scan?.status === 'COMPLETE') {
+          result = resultData;
           console.log(`✅ Scan completed!`);
           break;
-        } else if (resultData.result?.status === 'failed') {
+        } else if (resultData.scan?.status === 'FAILED') {
           console.error(`❌ Scan failed`);
           return new Response(
             JSON.stringify({
               success: false,
               error: 'Scan failed',
-              result: resultData.result
+              result: resultData
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
@@ -152,18 +155,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Analyze results
-    const summary = result.scan?.summary;
-    const malicious = summary?.malicious || false;
-    const categories = summary?.categories || [];
-    const verdict = summary?.verdict || 'clean';
-
+    // Analyze results from API v2
+    const verdict = result.scan?.verdict || 'unknown';
+    const malicious = verdict === 'malicious';
+    const categories = result.scan?.categories || [];
+    const technologies = result.scan?.technologies || [];
+    
     // Calculate score
     let score = 0;
     if (malicious) {
       score = 85;
-      if (categories.includes('Phishing')) score = Math.min(100, score + 15);
-      if (categories.includes('Malware')) score = Math.min(100, score + 15);
+      if (categories.some((c: string) => c.toLowerCase().includes('phishing'))) score = Math.min(100, score + 15);
+      if (categories.some((c: string) => c.toLowerCase().includes('malware'))) score = Math.min(100, score + 15);
     }
 
     return new Response(
@@ -176,9 +179,9 @@ Deno.serve(async (req) => {
         malicious,
         score,
         categories,
-        effectiveUrl: result.task?.effectiveUrl,
-        screenshot: result.task?.screenshot,
-        technologies: result.scan?.technologies || [],
+        effectiveUrl: result.page?.url,
+        screenshot: result.scan?.screenshot,
+        technologies,
         fullResult: result
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
