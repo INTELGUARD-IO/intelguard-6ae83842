@@ -25,13 +25,18 @@ const TestCloudflare = () => {
 
     try {
       const { data, error: invokeError } = await supabase.functions.invoke(
-        "cloudflare-urlscan-validator",
+        "test-cloudflare-scan",
         {
           body: { indicator, kind }
         }
       );
 
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        console.error("Invoke error:", invokeError);
+        throw invokeError;
+      }
+      
+      console.log("Scan result:", data);
       setResult(data);
     } catch (err: any) {
       console.error("Errore durante la scansione:", err);
