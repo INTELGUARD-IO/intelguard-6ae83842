@@ -69,10 +69,15 @@ export default {
         'gradient-hero': 'var(--gradient-hero)',
         'gradient-primary': 'var(--gradient-primary)',
         'gradient-accent': 'var(--gradient-accent)',
+        'gradient-card': 'var(--gradient-card)',
       },
       boxShadow: {
+        'glow-accent': 'var(--glow-accent)',
+        'glow-primary': 'var(--glow-primary)',
         'glow-cyan': 'var(--glow-cyan)',
-        'glow-purple': 'var(--glow-purple)',
+      },
+      textColor: {
+        'body': 'hsl(var(--body-text))',
       },
       borderRadius: {
         lg: "var(--radius)",

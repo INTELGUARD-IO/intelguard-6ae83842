@@ -8,62 +8,70 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Cyber-themed color palette for Intelguard.io */
-    --background: 220 50% 8%;
-    --foreground: 175 84% 90%;
+    /* INTELGUARD Design System - Dark Theme */
+    /* Base colors from brief */
+    --background: 218 41% 7%;        /* #0B0F1A */
+    --foreground: 214 100% 95%;      /* #E6F0FF - Headings */
+    
+    --body-text: 219 30% 78%;        /* #B6C2D9 - Body text */
+    
+    --card: 222 39% 11%;             /* #111827 */
+    --card-foreground: 214 100% 95%;
 
-    --card: 220 45% 12%;
-    --card-foreground: 175 84% 90%;
+    --popover: 222 39% 11%;
+    --popover-foreground: 214 100% 95%;
 
-    --popover: 220 50% 10%;
-    --popover-foreground: 175 84% 90%;
+    --primary: 216 100% 50%;         /* #0066FF - Blue accent */
+    --primary-foreground: 0 0% 100%;
 
-    --primary: 175 84% 60%;
-    --primary-foreground: 220 50% 8%;
-
-    --secondary: 271 76% 53%;
-    --secondary-foreground: 175 84% 95%;
+    --secondary: 223 63% 15%;        /* #0E1B3D - Dark blue */
+    --secondary-foreground: 214 100% 95%;
 
     --muted: 220 40% 18%;
-    --muted-foreground: 175 30% 70%;
+    --muted-foreground: 219 30% 78%;
 
-    --accent: 228 100% 59%;
+    --accent: 10 100% 60%;           /* #FF5533 - Orange/Red glow */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 220 40% 20%;
-    --input: 220 40% 18%;
-    --ring: 175 84% 60%;
+    --input: 222 39% 11%;
+    --ring: 10 100% 60%;
 
     --radius: 0.75rem;
 
-    /* Chart colors - Cyber theme compatible */
-    --chart-1: 175 84% 60%;  /* Cyan - Whitelisted */
-    --chart-2: 228 100% 59%; /* Blue - Deep Validated */
-    --chart-3: 271 76% 53%;  /* Purple - API Calls Saved */
-    --chart-4: 329 100% 59%; /* Pink - Future use */
-    --chart-5: 175 30% 70%;  /* Muted Cyan - Future use */
+    /* Chart colors */
+    --chart-1: 216 100% 50%;
+    --chart-2: 175 84% 60%;
+    --chart-3: 271 76% 53%;
+    --chart-4: 10 100% 60%;
+    --chart-5: 329 100% 59%;
 
-    /* Cyber gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(175 84% 60% / 0.1) 0%, hsl(271 76% 53% / 0.1) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(175 84% 60%) 0%, hsl(228 100% 59%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(271 76% 53%) 0%, hsl(329 100% 59%) 100%);
+    /* Hero gradient: #0B0F1A → #0E1B3D → #0066FF */
+    --gradient-hero: radial-gradient(ellipse at top, hsl(223 63% 15% / 0.8) 0%, hsl(218 41% 7%) 50%, hsl(216 100% 50% / 0.1) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(216 100% 50%) 0%, hsl(175 84% 60%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(10 100% 60%) 0%, hsl(329 100% 59%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(222 39% 11%) 0%, hsl(220 40% 13%) 100%);
     
     /* Glow effects */
+    --glow-accent: 0 0 40px hsl(10 100% 60% / 0.5);
+    --glow-primary: 0 0 30px hsl(216 100% 50% / 0.4);
     --glow-cyan: 0 0 30px hsl(175 84% 60% / 0.3);
-    --glow-purple: 0 0 30px hsl(271 76% 53% / 0.3);
+    
+    /* Beam background */
+    --beam-color: hsl(216 100% 50% / 0.15);
     
     /* Sidebar */
-    --sidebar-background: 220 50% 8%;
-    --sidebar-foreground: 175 84% 90%;
-    --sidebar-primary: 175 84% 60%;
-    --sidebar-primary-foreground: 220 50% 8%;
-    --sidebar-accent: 220 45% 12%;
-    --sidebar-accent-foreground: 175 84% 90%;
+    --sidebar-background: 218 41% 7%;
+    --sidebar-foreground: 214 100% 95%;
+    --sidebar-primary: 216 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 39% 11%;
+    --sidebar-accent-foreground: 214 100% 95%;
     --sidebar-border: 220 40% 20%;
-    --sidebar-ring: 175 84% 60%;
+    --sidebar-ring: 10 100% 60%;
   }
 }
 
