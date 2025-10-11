@@ -226,8 +226,9 @@ const Index = () => {
           
           <div className="max-w-4xl mx-auto mt-8 px-4">
             <p className="text-lg text-muted-foreground text-center leading-relaxed">
-              pfSense/OPNsense aliases, Fortinet & PAN EDLs, Check Point, Sophos, Watchguard, SonicWall, plus SIEM enrichment for Splunk/Graylog/Wazuh.{' '}
-              <span className="text-xl font-bold bg-gradient-to-r from-accent via-primary to-accent bg-clip-text text-transparent">
+              pfSense/OPNsense aliases, Fortinet & PAN EDLs, Check Point, Sophos, Watchguard, SonicWall, plus SIEM enrichment for Splunk/Graylog/Wazuh.
+              <br />
+              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 No agents—just a URL.
               </span>
             </p>
