@@ -1,19 +1,9 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Shield, Activity, Globe, TrendingUp } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/dashboard');
-      }
-    });
-  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
