@@ -526,28 +526,6 @@ export default function IngestSources() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>IPv4 Sources</CardTitle>
-            <CardDescription>{ipv4Sources.filter(s => s.enabled).length} of {ipv4Sources.length} enabled</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{ipv4Sources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total indicators collected</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Domain Sources</CardTitle>
-            <CardDescription>{domainSources.filter(s => s.enabled).length} of {domainSources.length} enabled</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{domainSources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total indicators collected</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Database Raw Indicators</CardTitle>
             <CardDescription>
               <Badge variant="outline" className="mr-2">
@@ -572,6 +550,28 @@ export default function IngestSources() {
                 <div className="h-4 w-48 bg-muted animate-pulse rounded" />
               )}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>IPv4 Sources</CardTitle>
+            <CardDescription>{ipv4Sources.filter(s => s.enabled).length} of {ipv4Sources.length} enabled</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{ipv4Sources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total indicators collected</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Domain Sources</CardTitle>
+            <CardDescription>{domainSources.filter(s => s.enabled).length} of {domainSources.length} enabled</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{domainSources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total indicators collected</p>
           </CardContent>
         </Card>
       </div>
