@@ -223,7 +223,7 @@ const Index = () => {
       <section className="py-14">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Automate your Threat Protection
             </h2>
           </div>
@@ -246,7 +246,7 @@ const Index = () => {
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               When recon meets mass exploitation,
               <br />
               your window to act is seconds
@@ -299,8 +299,8 @@ const Index = () => {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              How it Works
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
+              True Threat Feeds™ Process
             </h2>
             <p className="text-xl text-body">
               5-stage pipeline from ingestion to publication
@@ -318,7 +318,7 @@ const Index = () => {
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Key Capabilities
             </h2>
           </div>
@@ -353,7 +353,7 @@ const Index = () => {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Live Feed Preview
             </h2>
             <p className="text-xl text-body">
@@ -371,7 +371,7 @@ const Index = () => {
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               By the Numbers
             </h2>
             <p className="text-xl text-body">
@@ -388,7 +388,7 @@ const Index = () => {
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Developer Quickstart
             </h2>
             <p className="text-xl text-body">
@@ -414,7 +414,7 @@ const Index = () => {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Simple, Transparent Pricing
             </h2>
             <p className="text-xl text-body">
@@ -512,7 +512,7 @@ const Index = () => {
       <section className="py-20 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Frequently Asked Questions
             </h2>
           </div>
