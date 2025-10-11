@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, ArrowRight, Database, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Upload, ArrowRight, Database, Filter, ChevronLeft, ChevronRight, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -593,24 +593,68 @@ export default function IngestSources() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>IPv4 Sources</CardTitle>
-            <CardDescription>{ipv4Sources.filter(s => s.enabled).length} of {ipv4Sources.length} enabled</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>IPv4 Raw Indicators</CardTitle>
+              <CardDescription>{ipv4Sources.filter(s => s.enabled).length} of {ipv4Sources.length} feeds enabled</CardDescription>
+            </div>
+            <Globe className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ipv4Sources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total indicators collected</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-2xl font-bold">
+                {rawIndicatorStats ? rawIndicatorStats.ipv4.toLocaleString() : '...'}
+              </div>
+              {rawIndicatorStats && rawIndicatorStats.ipv4 > 0 && rawIndicatorStats.uniqueIpv4 > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {((rawIndicatorStats.uniqueIpv4 / rawIndicatorStats.ipv4) * 100).toFixed(1)}% unique
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rawIndicatorStats ? (
+                <>
+                  {rawIndicatorStats.uniqueIpv4.toLocaleString()} unique addresses
+                  {' • '}
+                  from {ipv4Sources.length} feeds
+                </>
+              ) : (
+                'Loading...'
+              )}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Domain Sources</CardTitle>
-            <CardDescription>{domainSources.filter(s => s.enabled).length} of {domainSources.length} enabled</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>Domain Raw Indicators</CardTitle>
+              <CardDescription>{domainSources.filter(s => s.enabled).length} of {domainSources.length} feeds enabled</CardDescription>
+            </div>
+            <Globe className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{domainSources.reduce((sum, s) => sum + s.indicators_count, 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total indicators collected</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-2xl font-bold">
+                {rawIndicatorStats ? rawIndicatorStats.domain.toLocaleString() : '...'}
+              </div>
+              {rawIndicatorStats && rawIndicatorStats.domain > 0 && rawIndicatorStats.uniqueDomains > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {((rawIndicatorStats.uniqueDomains / rawIndicatorStats.domain) * 100).toFixed(1)}% unique
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rawIndicatorStats ? (
+                <>
+                  {rawIndicatorStats.uniqueDomains.toLocaleString()} unique domains
+                  {' • '}
+                  from {domainSources.length} feeds
+                </>
+              ) : (
+                'Loading...'
+              )}
+            </p>
           </CardContent>
         </Card>
       </div>
