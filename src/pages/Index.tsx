@@ -347,7 +347,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Integrates with your stack
+              Automate your Threat Protection
             </h2>
           </div>
 
