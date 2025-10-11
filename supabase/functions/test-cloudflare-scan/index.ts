@@ -20,17 +20,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    const cloudflareToken = Deno.env.get('CLOUDFLARE_URLSCAN_API_KEY');
-    const cloudflareAccountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID');
+    const cfApiToken = Deno.env.get('CLOUDFLARE_URLSCAN_API_KEY');
+    const cfAccountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID');
 
-    if (!cloudflareToken || !cloudflareAccountId) {
+    if (!cfApiToken || !cfAccountId) {
       return new Response(
         JSON.stringify({ 
           error: 'Cloudflare credentials not configured',
           details: {
-            hasToken: !!cloudflareToken,
-            hasAccountId: !!cloudflareAccountId,
-            accountId: cloudflareAccountId
+            hasToken: !!cfApiToken,
+            hasAccountId: !!cfAccountId,
+            message: 'CLOUDFLARE_URLSCAN_API_KEY e CLOUDFLARE_ACCOUNT_ID devono essere configurati'
           }
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -38,13 +38,15 @@ Deno.serve(async (req) => {
     }
 
     console.log(`🔍 Testing scan for ${kind}: ${indicator}`);
+    console.log(`📋 Account ID: ${cfAccountId}`);
 
-    // Prepare scan URL
+    // Prepare scan URL with EXPLICIT schema (http:// or https://)
     const scanTargetUrl = kind === 'ipv4' 
       ? `http://${indicator}` 
       : `https://${indicator}`;
 
-    const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan`;
+    // Use URL Scanner v2 API endpoint
+    const scanUrl = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/urlscanner/v2/scan`;
     
     console.log(`📤 Submitting scan to: ${scanUrl}`);
     console.log(`🎯 Target URL: ${scanTargetUrl}`);
@@ -53,7 +55,7 @@ Deno.serve(async (req) => {
     const scanResponse = await fetch(scanUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${cloudflareToken}`,
+        'Authorization': `Bearer ${cfApiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -111,10 +113,10 @@ Deno.serve(async (req) => {
       console.log(`⏳ Polling attempt ${attempt + 1}/${maxAttempts}...`);
       await new Promise(resolve => setTimeout(resolve, pollDelay));
 
-      const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/urlscanner/scan/${scanUuid}`;
+      const resultUrl = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/urlscanner/scan/${scanUuid}`;
       const resultResponse = await fetch(resultUrl, {
         headers: {
-          'Authorization': `Bearer ${cloudflareToken}`,
+          'Authorization': `Bearer ${cfApiToken}`,
         },
       });
 

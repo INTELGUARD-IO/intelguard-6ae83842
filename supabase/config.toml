@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.ipqualityscore-validator]
 verify_jwt = false
+
+[functions.test-cloudflare-scan]
+verify_jwt = false

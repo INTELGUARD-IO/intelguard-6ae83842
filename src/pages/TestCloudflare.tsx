@@ -33,7 +33,30 @@ const TestCloudflare = () => {
 
       if (invokeError) {
         console.error("Invoke error:", invokeError);
-        throw invokeError;
+        setError(invokeError.message || "Errore durante la chiamata alla funzione");
+        return;
+      }
+
+      // Handle HTTP errors from the edge function
+      if (data && !data.success) {
+        console.error("Edge function error:", data);
+        
+        // Handle 403 errors specifically
+        if (data.status === 403) {
+          setError(
+            `❌ Errore di autenticazione Cloudflare (403):\n\n` +
+            `Il token API non ha i permessi corretti.\n\n` +
+            `Verifica che il token abbia gli scope:\n` +
+            `• URL Scanner: Read\n` +
+            `• URL Scanner: Write\n\n` +
+            `Account ID utilizzato: ${data.requestUrl?.includes('/accounts/') ? 
+              data.requestUrl.split('/accounts/')[1]?.split('/')[0] : 'N/A'}`
+          );
+        } else {
+          setError(data.error || "Errore sconosciuto dalla scansione");
+        }
+        setResult(data);
+        return;
       }
       
       console.log("Scan result:", data);
@@ -157,10 +180,11 @@ const TestCloudflare = () => {
             <CardTitle>Note</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• Dai log vedo che Cloudflare sta restituendo errori di autenticazione (403)</p>
-            <p>• Verifica che l'API key di Cloudflare sia configurata correttamente</p>
-            <p>• L'account ID utilizzato è: 836a786b056873541c95b46ce5703f7f</p>
-            <p>• Endpoint: /accounts/ACCOUNT_ID/urlscanner/scan</p>
+            <p>• Questa funzione testa l'integrazione con Cloudflare URL Scanner v2</p>
+            <p>• Usa un Account API Token (non User token)</p>
+            <p>• Il token deve avere gli scope: URL Scanner Read + Write</p>
+            <p>• Endpoint: POST /accounts/ACCOUNT_ID/urlscanner/v2/scan</p>
+            <p>• La scansione può richiedere fino a 30 secondi</p>
           </CardContent>
         </Card>
       </div>
