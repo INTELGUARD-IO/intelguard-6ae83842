@@ -173,8 +173,23 @@ function HeroGeometric({
                 {title1}
               </span>
               <br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-foreground/90 to-accent">
-                {title2}
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-foreground/90 to-accent inline-block">
+                {title2.split("").map((char, index) => (
+                  <motion.span
+                    key={index}
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{
+                      duration: 0.8,
+                      delay: 1.2 + index * 0.05,
+                      ease: [0.23, 1, 0.32, 1] as const,
+                    }}
+                    className="inline-block"
+                    style={{ whiteSpace: char === " " ? "pre" : "normal" }}
+                  >
+                    {char}
+                  </motion.span>
+                ))}
               </span>
             </h1>
           </motion.div>
