@@ -176,7 +176,7 @@ const Index = () => {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-primary mb-4">
               Why INTELGUARD?
             </h2>
             <p className="text-xl text-body max-w-2xl mx-auto">
@@ -212,7 +212,7 @@ const Index = () => {
           </div>
           
           <div className="text-center max-w-4xl mx-auto mt-12">
-            <p className="text-lg text-transparent bg-clip-text bg-gradient-primary leading-relaxed">
+            <p className="text-lg text-body leading-relaxed">
               INTELGUARD delivers analyst-validated, real-time threat indicators to stop exploitation before it spreads. We fuse global telemetry with human review to cut false positives and enrich every IOC with CVE/MITRE context, TTLs, and confidence. Feeds ship in ready-made formats for firewalls, SIEM, and IDS/IPS—so teams auto-sync blocklists and enrich alerts in minutes, with no per-lookup friction.
             </p>
           </div>
