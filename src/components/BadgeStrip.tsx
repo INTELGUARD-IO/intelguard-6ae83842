@@ -33,7 +33,7 @@ export const BadgeStrip = () => {
         {certifications.map((cert) => (
           <div
             key={cert.name}
-            className="flex items-center justify-center w-full min-h-[102px] px-4 py-4 bg-white rounded-xl shadow-sm"
+            className="flex items-center justify-center w-full min-h-[102px] px-2 py-4 bg-white rounded-xl shadow-sm"
           >
             <img
               src={cert.src}
