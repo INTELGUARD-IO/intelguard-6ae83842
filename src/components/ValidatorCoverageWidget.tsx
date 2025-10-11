@@ -30,7 +30,10 @@ export function ValidatorCoverageWidget() {
       if (error) throw error;
       return data as CoverageData[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 min
+    staleTime: 90000, // 90s
+    gcTime: 300000, // 5 min
+    refetchOnWindowFocus: false,
   });
 
   if (isLoading) {

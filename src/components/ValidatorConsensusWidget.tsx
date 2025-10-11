@@ -51,7 +51,10 @@ export const ValidatorConsensusWidget = () => {
         coverage: coverage
       };
     },
-    refetchInterval: 30000 // Refresh every 30s
+    refetchInterval: 90000, // 90s
+    staleTime: 75000, // 75s
+    gcTime: 300000, // 5 min
+    refetchOnWindowFocus: false,
   });
 
   if (!stats) return null;

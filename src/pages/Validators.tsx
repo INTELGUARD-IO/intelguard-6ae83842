@@ -10,6 +10,8 @@ import { useUserRole } from "@/hooks/useUserRole";
 import WhitelistMetrics from "@/components/WhitelistMetrics";
 import WhitelistTimeline from "@/components/WhitelistTimeline";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RefreshCoordinatorProvider, useRefreshCoordinator } from "@/contexts/RefreshCoordinator";
+import { formatDistanceToNow } from "date-fns";
 
 interface ValidatorStats {
   name: string;
@@ -85,8 +87,9 @@ const ValidatorsSkeleton = () => (
   </div>
 );
 
-export default function Validators() {
+function ValidatorsContent() {
   const { isSuperAdmin, loading: roleLoading } = useUserRole();
+  const { lastRefresh } = useRefreshCoordinator();
   const [validators, setValidators] = useState<ValidatorStats[]>([]);
   const [jobStats, setJobStats] = useState<ValidationJobStats>({
     totalIndicators: 0,
@@ -138,210 +141,144 @@ export default function Validators() {
 
   const loadValidatorStats = async () => {
     try {
-      const stats: ValidatorStats[] = [];
-
-      // AbuseIPDB
-      const abuseipdbData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('abuseipdb_score, last_validated')
-        .eq('abuseipdb_checked', true);
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
-      const abuseipdbRecentCount = await supabase
-        .from('abuseipdb_blacklist')
-        .select('*', { count: 'exact', head: true })
-        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      // Parallelize ALL queries using Promise.all for maximum performance
+      const [
+        abuseipdbData,
+        abuseipdbRecentCount,
+        abusechData,
+        abusechRecentCount,
+        vtData,
+        vtRecentCount,
+        urlscanData,
+        urlscanRecentCount,
+        neutrinoData,
+        neutrinoRecentCount,
+        honeydbData,
+        honeydbRecentCount,
+        censysData,
+        censysRecentCount,
+        otxData,
+        otxRecentCount,
+        safebrowsingData,
+        safebrowsingRecentCount,
+        cloudflareUrlscanData,
+        cloudflareUrlscanRecentCount
+      ] = await Promise.all([
+        // AbuseIPDB
+        supabase.from('dynamic_raw_indicators').select('abuseipdb_score, last_validated').eq('abuseipdb_checked', true),
+        supabase.from('abuseipdb_blacklist').select('*', { count: 'exact', head: true }).gte('added_at', twentyFourHoursAgo),
+        // Abuse.ch
+        supabase.from('dynamic_raw_indicators').select('last_validated').eq('abuse_ch_checked', true),
+        supabase.from('abuse_ch_fplist').select('*', { count: 'exact', head: true }).gte('added_at', twentyFourHoursAgo),
+        // VirusTotal
+        supabase.from('vendor_checks').select('score, checked_at').ilike('vendor', 'virustotal').order('checked_at', { ascending: false }),
+        supabase.from('vendor_checks').select('*', { count: 'exact', head: true }).ilike('vendor', 'virustotal').gte('checked_at', twentyFourHoursAgo),
+        // URLScan
+        supabase.from('dynamic_raw_indicators').select('urlscan_score, last_validated').eq('urlscan_checked', true),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('urlscan_checked', true).gte('last_validated', twentyFourHoursAgo),
+        // NeutrinoAPI
+        supabase.from('dynamic_raw_indicators').select('neutrinoapi_host_reputation_score, last_validated').eq('neutrinoapi_checked', true),
+        supabase.from('neutrinoapi_blocklist').select('*', { count: 'exact', head: true }).gte('added_at', twentyFourHoursAgo),
+        // HoneyDB
+        supabase.from('dynamic_raw_indicators').select('honeydb_threat_score, last_validated').eq('honeydb_checked', true),
+        supabase.from('honeydb_blacklist').select('*', { count: 'exact', head: true }).gte('added_at', twentyFourHoursAgo),
+        // Censys
+        supabase.from('dynamic_raw_indicators').select('censys_score, last_validated').eq('censys_checked', true),
+        supabase.from('dynamic_raw_indicators').select('*', { count: 'exact', head: true }).eq('censys_checked', true).gte('last_validated', twentyFourHoursAgo),
+        // OTX
+        supabase.from('otx_enrichment').select('score, refreshed_at').order('refreshed_at', { ascending: false }),
+        supabase.from('otx_enrichment').select('*', { count: 'exact', head: true }).gte('refreshed_at', twentyFourHoursAgo),
+        // Google Safe Browsing
+        supabase.from('google_safebrowsing_cache').select('score, checked_at').order('checked_at', { ascending: false }),
+        supabase.from('google_safebrowsing_cache').select('*', { count: 'exact', head: true }).gte('checked_at', twentyFourHoursAgo),
+        // Cloudflare URLScan
+        supabase.from('dynamic_raw_indicators').select('cloudflare_urlscan_score, last_validated').eq('cloudflare_urlscan_checked', true),
+        supabase.from('cloudflare_urlscan_cache').select('*', { count: 'exact', head: true }).gte('checked_at', twentyFourHoursAgo)
+      ]);
 
-      stats.push({
-        name: 'AbuseIPDB',
-        totalChecks: abuseipdbData.data?.length || 0,
-        recentChecks: abuseipdbRecentCount.count || 0,
-        avgScore: abuseipdbData.data?.length ? 
-          abuseipdbData.data.reduce((sum, r) => sum + (r.abuseipdb_score || 0), 0) / abuseipdbData.data.length : 0,
-        lastCheck: abuseipdbData.data?.[0]?.last_validated || null
-      });
-
-      // Abuse.ch
-      const abusechData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('last_validated')
-        .eq('abuse_ch_checked', true);
-
-      const abusechRecentCount = await supabase
-        .from('abuse_ch_fplist')
-        .select('*', { count: 'exact', head: true })
-        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'Abuse.ch',
-        totalChecks: abusechData.data?.length || 0,
-        recentChecks: abusechRecentCount.count || 0,
-        avgScore: 0,
-        lastCheck: abusechData.data?.[0]?.last_validated || null
-      });
-
-      // VirusTotal
-      const vtData = await supabase
-        .from('vendor_checks')
-        .select('score, checked_at')
-        .ilike('vendor', 'virustotal')
-        .order('checked_at', { ascending: false });
-
-      const vtRecentCount = await supabase
-        .from('vendor_checks')
-        .select('*', { count: 'exact', head: true })
-        .ilike('vendor', 'virustotal')
-        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'VirusTotal',
-        totalChecks: vtData.data?.length || 0,
-        recentChecks: vtRecentCount.count || 0,
-        avgScore: vtData.data?.length ?
-          vtData.data.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / vtData.data.length : 0,
-        lastCheck: vtData.data?.[0]?.checked_at || null
-      });
-
-      // URLScan
-      const urlscanData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('urlscan_score, last_validated')
-        .eq('urlscan_checked', true);
-
-      const urlscanRecentCount = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('urlscan_checked', true)
-        .gte('last_validated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'URLScan',
-        totalChecks: urlscanData.data?.length || 0,
-        recentChecks: urlscanRecentCount.count || 0,
-        avgScore: urlscanData.data?.length ?
-          urlscanData.data.reduce((sum, r) => sum + (r.urlscan_score || 0), 0) / urlscanData.data.length : 0,
-        lastCheck: urlscanData.data?.[0]?.last_validated || null
-      });
-
-      // NeutrinoAPI
-      const neutrinoData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('neutrinoapi_host_reputation_score, last_validated')
-        .eq('neutrinoapi_checked', true);
-
-      const neutrinoRecentCount = await supabase
-        .from('neutrinoapi_blocklist')
-        .select('*', { count: 'exact', head: true })
-        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'NeutrinoAPI',
-        totalChecks: neutrinoData.data?.length || 0,
-        recentChecks: neutrinoRecentCount.count || 0,
-        avgScore: neutrinoData.data?.length ?
-          neutrinoData.data.reduce((sum, r) => sum + (r.neutrinoapi_host_reputation_score || 0), 0) / neutrinoData.data.length : 0,
-        lastCheck: neutrinoData.data?.[0]?.last_validated || null
-      });
-
-      // HoneyDB
-      const honeydbData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('honeydb_threat_score, last_validated')
-        .eq('honeydb_checked', true);
-
-      const honeydbRecentCount = await supabase
-        .from('honeydb_blacklist')
-        .select('*', { count: 'exact', head: true })
-        .gte('added_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'HoneyDB',
-        totalChecks: honeydbData.data?.length || 0,
-        recentChecks: honeydbRecentCount.count || 0,
-        avgScore: honeydbData.data?.length ?
-          honeydbData.data.reduce((sum, r) => sum + (r.honeydb_threat_score || 0), 0) / honeydbData.data.length : 0,
-        lastCheck: honeydbData.data?.[0]?.last_validated || null
-      });
-
-      // Censys
-      const censysData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('censys_score, last_validated')
-        .eq('censys_checked', true);
-
-      const censysRecentCount = await supabase
-        .from('dynamic_raw_indicators')
-        .select('*', { count: 'exact', head: true })
-        .eq('censys_checked', true)
-        .gte('last_validated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'Censys',
-        totalChecks: censysData.data?.length || 0,
-        recentChecks: censysRecentCount.count || 0,
-        avgScore: censysData.data?.length ?
-          censysData.data.reduce((sum, r) => sum + (r.censys_score || 0), 0) / censysData.data.length : 0,
-        lastCheck: censysData.data?.[0]?.last_validated || null
-      });
-
-      // OTX
-      const otxData = await supabase
-        .from('otx_enrichment')
-        .select('score, refreshed_at')
-        .order('refreshed_at', { ascending: false });
-
-      const otxRecentCount = await supabase
-        .from('otx_enrichment')
-        .select('*', { count: 'exact', head: true })
-        .gte('refreshed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'OTX',
-        totalChecks: otxData.data?.length || 0,
-        recentChecks: otxRecentCount.count || 0,
-        avgScore: otxData.data?.length ?
-          otxData.data.reduce((sum, r) => sum + (r.score || 0), 0) / otxData.data.length : 0,
-        lastCheck: otxData.data?.[0]?.refreshed_at || null
-      });
-
-      // Google Safe Browsing
-      const safebrowsingData = await supabase
-        .from('google_safebrowsing_cache')
-        .select('score, checked_at')
-        .order('checked_at', { ascending: false });
-
-      const safebrowsingRecentCount = await supabase
-        .from('google_safebrowsing_cache')
-        .select('*', { count: 'exact', head: true })
-        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'Google Safe Browsing',
-        totalChecks: safebrowsingData.data?.length || 0,
-        recentChecks: safebrowsingRecentCount.count || 0,
-        avgScore: safebrowsingData.data?.length ?
-          safebrowsingData.data.reduce((sum, r) => sum + (r.score || 0), 0) / safebrowsingData.data.length : 0,
-        lastCheck: safebrowsingData.data?.[0]?.checked_at || null
-      });
-
-      // Cloudflare URLScan
-      const cloudflareUrlscanData = await supabase
-        .from('dynamic_raw_indicators')
-        .select('cloudflare_urlscan_score, last_validated')
-        .eq('cloudflare_urlscan_checked', true);
-
-      const cloudflareUrlscanRecentCount = await supabase
-        .from('cloudflare_urlscan_cache')
-        .select('*', { count: 'exact', head: true })
-        .gte('checked_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      stats.push({
-        name: 'Cloudflare URLScan',
-        totalChecks: cloudflareUrlscanData.data?.length || 0,
-        recentChecks: cloudflareUrlscanRecentCount.count || 0,
-        avgScore: cloudflareUrlscanData.data?.length ?
-          cloudflareUrlscanData.data.reduce((sum, r) => sum + (r.cloudflare_urlscan_score || 0), 0) / cloudflareUrlscanData.data.length : 0,
-        lastCheck: cloudflareUrlscanData.data?.[0]?.last_validated || null
-      });
+      const stats: ValidatorStats[] = [
+        {
+          name: 'AbuseIPDB',
+          totalChecks: abuseipdbData.data?.length || 0,
+          recentChecks: abuseipdbRecentCount.count || 0,
+          avgScore: abuseipdbData.data?.length ? 
+            abuseipdbData.data.reduce((sum, r) => sum + (r.abuseipdb_score || 0), 0) / abuseipdbData.data.length : 0,
+          lastCheck: abuseipdbData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'Abuse.ch',
+          totalChecks: abusechData.data?.length || 0,
+          recentChecks: abusechRecentCount.count || 0,
+          avgScore: 0,
+          lastCheck: abusechData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'VirusTotal',
+          totalChecks: vtData.data?.length || 0,
+          recentChecks: vtRecentCount.count || 0,
+          avgScore: vtData.data?.length ?
+            vtData.data.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / vtData.data.length : 0,
+          lastCheck: vtData.data?.[0]?.checked_at || null
+        },
+        {
+          name: 'URLScan',
+          totalChecks: urlscanData.data?.length || 0,
+          recentChecks: urlscanRecentCount.count || 0,
+          avgScore: urlscanData.data?.length ?
+            urlscanData.data.reduce((sum, r) => sum + (r.urlscan_score || 0), 0) / urlscanData.data.length : 0,
+          lastCheck: urlscanData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'NeutrinoAPI',
+          totalChecks: neutrinoData.data?.length || 0,
+          recentChecks: neutrinoRecentCount.count || 0,
+          avgScore: neutrinoData.data?.length ?
+            neutrinoData.data.reduce((sum, r) => sum + (r.neutrinoapi_host_reputation_score || 0), 0) / neutrinoData.data.length : 0,
+          lastCheck: neutrinoData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'HoneyDB',
+          totalChecks: honeydbData.data?.length || 0,
+          recentChecks: honeydbRecentCount.count || 0,
+          avgScore: honeydbData.data?.length ?
+            honeydbData.data.reduce((sum, r) => sum + (r.honeydb_threat_score || 0), 0) / honeydbData.data.length : 0,
+          lastCheck: honeydbData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'Censys',
+          totalChecks: censysData.data?.length || 0,
+          recentChecks: censysRecentCount.count || 0,
+          avgScore: censysData.data?.length ?
+            censysData.data.reduce((sum, r) => sum + (r.censys_score || 0), 0) / censysData.data.length : 0,
+          lastCheck: censysData.data?.[0]?.last_validated || null
+        },
+        {
+          name: 'OTX',
+          totalChecks: otxData.data?.length || 0,
+          recentChecks: otxRecentCount.count || 0,
+          avgScore: otxData.data?.length ?
+            otxData.data.reduce((sum, r) => sum + (r.score || 0), 0) / otxData.data.length : 0,
+          lastCheck: otxData.data?.[0]?.refreshed_at || null
+        },
+        {
+          name: 'Google Safe Browsing',
+          totalChecks: safebrowsingData.data?.length || 0,
+          recentChecks: safebrowsingRecentCount.count || 0,
+          avgScore: safebrowsingData.data?.length ?
+            safebrowsingData.data.reduce((sum, r) => sum + (r.score || 0), 0) / safebrowsingData.data.length : 0,
+          lastCheck: safebrowsingData.data?.[0]?.checked_at || null
+        },
+        {
+          name: 'Cloudflare URLScan',
+          totalChecks: cloudflareUrlscanData.data?.length || 0,
+          recentChecks: cloudflareUrlscanRecentCount.count || 0,
+          avgScore: cloudflareUrlscanData.data?.length ?
+            cloudflareUrlscanData.data.reduce((sum, r) => sum + (r.cloudflare_urlscan_score || 0), 0) / cloudflareUrlscanData.data.length : 0,
+          lastCheck: cloudflareUrlscanData.data?.[0]?.last_validated || null
+        }
+      ];
 
       setValidators(stats);
     } catch (error) {
@@ -391,6 +328,7 @@ export default function Validators() {
     }
   };
 
+  // Load data when lastRefresh changes (controlled by RefreshCoordinator)
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -403,11 +341,7 @@ export default function Validators() {
     };
 
     loadData();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [lastRefresh]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -441,9 +375,14 @@ export default function Validators() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Validation System Status</h1>
-        <p className="text-muted-foreground">Real-time monitoring of all validators and validation jobs</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Validation System Status</h1>
+          <p className="text-muted-foreground">Real-time monitoring of all validators and validation jobs</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Last updated: {formatDistanceToNow(lastRefresh, { addSuffix: true })}
+        </p>
       </div>
 
       {/* Whitelist Metrics - Always visible */}
@@ -655,5 +594,13 @@ export default function Validators() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function Validators() {
+  return (
+    <RefreshCoordinatorProvider>
+      <ValidatorsContent />
+    </RefreshCoordinatorProvider>
   );
 }

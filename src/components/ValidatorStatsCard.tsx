@@ -56,8 +56,10 @@ export const ValidatorStatsCard = () => {
         },
       };
     },
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 90000, // 90s
+    staleTime: 75000, // 75s
+    gcTime: 300000, // 5 min
+    refetchOnWindowFocus: false,
   });
 
   if (!stats) return null;

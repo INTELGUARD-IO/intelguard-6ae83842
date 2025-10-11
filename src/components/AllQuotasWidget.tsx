@@ -134,7 +134,10 @@ export const AllQuotasWidget = () => {
 
       return quotasData;
     },
-    refetchInterval: 30000 // Refresh every 30s
+    refetchInterval: 120000, // 2 min
+    staleTime: 90000, // 90s
+    gcTime: 300000, // 5 min
+    refetchOnWindowFocus: false,
   });
 
   if (!quotas) return null;
