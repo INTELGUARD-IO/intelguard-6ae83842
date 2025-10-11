@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Eye, AlertTriangle, Clock, Zap, Target, Lock, DollarSign, CheckCircle, PlayCircle } from 'lucide-react';
+import { Shield, Eye, AlertTriangle, Clock, Zap, Target, Lock, DollarSign, CheckCircle, PlayCircle, TrendingUp } from 'lucide-react';
 import { BeamBackground } from '@/components/BeamBackground';
 import { BadgeStrip } from '@/components/BadgeStrip';
 import { PipelineVisual } from '@/components/PipelineVisual';
@@ -150,7 +150,22 @@ const Index = () => {
               </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-6 justify-center items-center text-sm text-muted-foreground pt-8">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-accent" />
+                <span>Multi-vendor validation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-accent" />
+                <span>Real-time updates</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-accent" />
+                <span>99.9% uptime</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground pt-4">
               Reduced trial, no credit card. True Threat Feeds™.
             </p>
           </motion.div>
