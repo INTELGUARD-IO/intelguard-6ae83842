@@ -1836,11 +1836,14 @@ export type Database = {
         Args: { p_kind?: string; p_limit?: number; p_page?: number }
         Returns: {
           asn: string
+          asn_name: string
           confidence: number
           country: string
           indicator: string
           kind: string
           last_validated: string
+          source_count: number
+          sources: string[]
           threat_type: string
           total_count: number
         }[]
