@@ -1,25 +1,23 @@
-import comptiaCysa from '@/assets/certifications/comptia-cysa.png';
-import comptiaPentest from '@/assets/certifications/comptia-pentest.png';
-import comptiaCasp from '@/assets/certifications/comptia-casp.png';
-import comptiaNetwork from '@/assets/certifications/comptia-network.png';
-import comptiaSecurity from '@/assets/certifications/comptia-security.png';
-import ciscoCcnpServiceProvider from '@/assets/certifications/cisco-ccnp-service-provider.png';
-import ciscoCybersecurityAssociate from '@/assets/certifications/cisco-cybersecurity-associate.png';
-import ciscoCcieSecurity from '@/assets/certifications/cisco-ccie-security.png';
-import ciscoCcnpSecurity from '@/assets/certifications/cisco-ccnp-security.png';
-import ciscoEthicalHackingCtf from '@/assets/certifications/cisco-ethical-hacking-ctf.png';
+import intelguardCysa from '@/assets/certifications/intelguard-cysa.png';
+import intelguardPentest from '@/assets/certifications/intelguard-pentest.png';
+import intelguardNetwork from '@/assets/certifications/intelguard-network.png';
+import intelguardCasp from '@/assets/certifications/intelguard-casp.png';
+import intelguardSecurity from '@/assets/certifications/intelguard-security.png';
+import intelguardCcnpSecurity from '@/assets/certifications/intelguard-ccnp-security.png';
+import intelguardCcie from '@/assets/certifications/intelguard-ccie.png';
+import intelguardCybersecurityAssociate from '@/assets/certifications/intelguard-cybersecurity-associate.png';
+import intelguardCcnpServiceProvider from '@/assets/certifications/intelguard-ccnp-service-provider.png';
 
 const certifications = [
-  { name: 'CompTIA CySA+', src: comptiaCysa },
-  { name: 'CompTIA PenTest+', src: comptiaPentest },
-  { name: 'CompTIA CASP+', src: comptiaCasp },
-  { name: 'CompTIA Network+', src: comptiaNetwork },
-  { name: 'CompTIA Security+', src: comptiaSecurity },
-  { name: 'Cisco CCNP Service Provider', src: ciscoCcnpServiceProvider },
-  { name: 'Cisco Cybersecurity Associate', src: ciscoCybersecurityAssociate },
-  { name: 'Cisco CCIE Security', src: ciscoCcieSecurity },
-  { name: 'Cisco CCNP Security', src: ciscoCcnpSecurity },
-  { name: 'Cisco Ethical Hacking CTF', src: ciscoEthicalHackingCtf },
+  { name: 'CompTIA CySA+', src: intelguardCysa },
+  { name: 'CompTIA PenTest+', src: intelguardPentest },
+  { name: 'CompTIA Network+', src: intelguardNetwork },
+  { name: 'CompTIA CASP+', src: intelguardCasp },
+  { name: 'CompTIA Security+', src: intelguardSecurity },
+  { name: 'Cisco CCNP Security', src: intelguardCcnpSecurity },
+  { name: 'Cisco CCIE Security', src: intelguardCcie },
+  { name: 'Cisco Cybersecurity Associate', src: intelguardCybersecurityAssociate },
+  { name: 'Cisco CCNP Service Provider', src: intelguardCcnpServiceProvider },
 ];
 
 export const BadgeStrip = () => {
@@ -35,12 +33,12 @@ export const BadgeStrip = () => {
         {certifications.map((cert) => (
           <div
             key={cert.name}
-            className="flex items-center justify-center w-full min-h-[140px] px-6 py-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all"
+            className="flex items-center justify-center w-full min-h-[140px] px-6 py-6"
           >
             <img
               src={cert.src}
               alt={cert.name}
-              className="h-16 w-auto object-contain max-w-full"
+              className="h-20 w-auto object-contain max-w-full"
               loading="lazy"
             />
           </div>
