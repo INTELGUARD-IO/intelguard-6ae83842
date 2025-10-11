@@ -16,6 +16,7 @@ import Monitoring from "./pages/Monitoring";
 import NetworkStatus from "./pages/NetworkStatus";
 import Validators from "./pages/Validators";
 import TestHome from "./pages/TestHome";
+import TestCloudflare from "./pages/TestCloudflare";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/test/home" element={<TestHome />} />
+          <Route path="/test/cloudflare" element={<TestCloudflare />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/indicators" element={<Indicators />} />
